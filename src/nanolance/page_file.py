@@ -2,17 +2,30 @@
 ROWS_PER_PAGE values, and a picker carries only the boxes a question needs.
 
 The page file: each column is stored as a run of pages, one column after
-another. A page is one read's worth of a single column's values.
+another. A page is one read's worth of a single column's values. After the
+pages come the column metadata (every column's format and page list, as
+JSON), and last a fixed-size footer that says where the metadata is.
 """
 
+import json
 import struct
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import BinaryIO
 
+from nanolance.counting import CountingFile
 from nanolance.orders import COLUMNS, Row, pack_value
 
 ROWS_PER_PAGE = 100
+
+# Analogy: the wall card at the back — always the same size, always the
+# last thing in the warehouse, so a picker knows where to find it.
+#
+# The footer: metadata offset (8 bytes), metadata size (8 bytes), format
+# version (4 bytes), and the magic bytes that name the format (4 bytes).
+FOOTER = struct.Struct("<QQI4s")
+MAGIC = b"NLNC"
+VERSION = 1
 
 
 @dataclass(frozen=True)
@@ -27,6 +40,21 @@ class Page:
     offset: int
     size: int
     rows: int
+
+
+@dataclass(frozen=True)
+class Metadata:
+    """Analogy: what the picker knows after reading the wall card and the
+    box lists it points to.
+
+    Everything a reader needs, taken from the file itself: the format
+    version, the row count, each column's codec, and each column's pages.
+    """
+
+    version: int
+    rows: int
+    codecs: dict[str, struct.Struct]
+    pages: dict[str, list[Page]]
 
 
 def write(
@@ -44,6 +72,22 @@ def write(
                 page = Page(offset=out.tell(), size=len(data), rows=len(chunk))
                 pages[column].append(page)
                 out.write(data)
+
+        metadata = {
+            "rows": len(rows),
+            "columns": [
+                {
+                    "name": column,
+                    "format": codec.format,
+                    "pages": [asdict(page) for page in pages[column]],
+                }
+                for column, codec in COLUMNS.items()
+            ],
+        }
+        raw = json.dumps(metadata, separators=(",", ":")).encode("utf-8")
+        metadata_offset = out.tell()
+        out.write(raw)
+        out.write(FOOTER.pack(metadata_offset, len(raw), VERSION, MAGIC))
     return pages
 
 
@@ -86,3 +130,24 @@ def read_rows(
             values.extend(page_values[max(start - first, 0) : stop - first])
         first += page.rows
     return values
+
+
+def read_metadata(f: CountingFile) -> Metadata:
+    """Analogy: walk to the back wall, read the wall card, then the box
+    lists it points to.
+
+    Two seeks and two reads: the footer (the file's last FOOTER.size
+    bytes), then the column metadata at the offset the footer gives.
+    """
+    f.seek(f.size - FOOTER.size)
+    footer = f.read(FOOTER.size)
+    metadata_offset, metadata_size, version, magic = FOOTER.unpack(footer)
+    f.seek(metadata_offset)
+    metadata = json.loads(f.read(metadata_size))
+    columns = metadata["columns"]
+    return Metadata(
+        version=version,
+        rows=metadata["rows"],
+        codecs={c["name"]: struct.Struct(c["format"]) for c in columns},
+        pages={c["name"]: [Page(**page) for page in c["pages"]] for c in columns},
+    )

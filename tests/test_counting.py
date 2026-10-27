@@ -27,3 +27,11 @@ def test_seeks_are_counted_and_move_the_position(tmp_path):
         f.seek(0)
         assert f.read(1) == bytes([0])
         assert (f.reads, f.bytes_read, f.seeks) == (2, 3, 2)
+
+
+def test_the_file_size_is_known_without_a_read(tmp_path):
+    path = tmp_path / "data.bin"
+    path.write_bytes(bytes(range(10)))
+    with CountingFile(path) as f:
+        assert f.size == 10
+        assert (f.reads, f.bytes_read, f.seeks) == (0, 0, 0)

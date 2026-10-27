@@ -91,3 +91,20 @@ def test_pages_reads_only_the_pages_it_needs(tmp_path):
         "qty of rows 10–19 from pages.bin = [40, 2, 1, 12, 4, 2, 3, 1, 40, 2]",
         "  tally: reads 1, bytes read 400, seeks 1",
     ]
+
+
+def test_pages_opens_the_file_from_its_footer(tmp_path):
+    lines = run_pages(tmp_path)
+    assert "write pages.bin: 33762 bytes, each column cut into pages" in lines
+    start = lines.index(
+        "open pages.bin: version 1, 1000 rows, columns id, price, qty, name, 40 pages"
+    )
+    assert lines[start : start + 6] == [
+        "open pages.bin: version 1, 1000 rows, columns id, price, qty, name, 40 pages",
+        "  tally: reads 2, bytes read 1762, seeks 2",
+        "sum(qty) from pages.bin, told nothing = 8125",
+        "  tally: reads 12, bytes read 5762, seeks 12",
+        "qty of rows 10–19 from pages.bin, told nothing = "
+        "[40, 2, 1, 12, 4, 2, 3, 1, 40, 2]",
+        "  tally: reads 3, bytes read 2162, seeks 3",
+    ]

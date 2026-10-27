@@ -15,6 +15,8 @@ class CountingFile:
 
     def __init__(self, path: Path) -> None:
         self._file = open(path, "rb")
+        # The file's length comes from the file system, not from a read.
+        self.size = path.stat().st_size
         self.reads = 0
         self.bytes_read = 0
         self.seeks = 0

@@ -114,6 +114,28 @@ def pages(folder: Path) -> None:
         print(f"qty of rows 10–19 from {pages_path.name} = {values}")
         print(f"  tally: {f.tally()}")
 
+    with CountingFile(pages_path) as f:
+        metadata = page_file.read_metadata(f)
+        names = ", ".join(metadata.codecs)
+        n_pages = sum(len(boxes) for boxes in metadata.pages.values())
+        print(
+            f"open {pages_path.name}: version {metadata.version}, "
+            f"{metadata.rows} rows, columns {names}, {n_pages} pages"
+        )
+        print(f"  tally: {f.tally()}")
+    with CountingFile(pages_path) as f:
+        metadata = page_file.read_metadata(f)
+        codec, boxes = metadata.codecs["qty"], metadata.pages["qty"]
+        total = sum(page_file.read_column(f, codec, boxes))
+        print(f"sum(qty) from {pages_path.name}, told nothing = {total}")
+        print(f"  tally: {f.tally()}")
+    with CountingFile(pages_path) as f:
+        metadata = page_file.read_metadata(f)
+        codec, boxes = metadata.codecs["qty"], metadata.pages["qty"]
+        values = page_file.read_rows(f, codec, boxes, 10, 20)
+        print(f"qty of rows 10–19 from {pages_path.name}, told nothing = {values}")
+        print(f"  tally: {f.tally()}")
+
 
 def main() -> int:
     """Run one demo by name; with no name, print the hello line."""
