@@ -1,11 +1,13 @@
 """The `nanolance` command line."""
 
 import argparse
+from itertools import groupby
 from pathlib import Path
 
 from nanolance import __version__, column_layout, page_file, row_layout
 from nanolance.counting import CountingFile
 from nanolance.orders import COLUMNS, ORDERS, ROW_WIDTH, many_orders
+from nanolance.page_file import ROWS_PER_PAGE
 
 
 def layouts(folder: Path) -> None:
@@ -144,6 +146,44 @@ def pages(folder: Path) -> None:
         print(f"  tally: {f.tally()}")
 
 
+def describe(values: list[int | float | str]) -> str:
+    """Analogy: the packer looks inside one box before sealing it.
+
+    How many distinct values the box holds, its longest run of equal values
+    side by side, and for whole numbers the largest one and how many bits
+    it needs.
+    """
+    longest = max(len(list(run)) for _, run in groupby(values))
+    facts = f"{len(set(values))} distinct, longest run {longest}"
+    if isinstance(values[0], int):
+        largest = max(values)
+        facts += f", largest {largest} needs {largest.bit_length()} bits"
+    return facts
+
+
+def packing(folder: Path) -> None:
+    """Analogy: the packer looks inside the boxes — the same few values said
+    again and again, each in a full-size compartment.
+
+    For the first page of every column, print its plain size and what it
+    holds, for the orders as placed and for the same orders sorted by name.
+    """
+    folder.mkdir(parents=True, exist_ok=True)
+    orders = many_orders(1000)
+    by_name = sorted(orders, key=lambda row: row[3])
+    names = ", ".join(COLUMNS)
+    print(
+        f"the orders table: {len(orders)} rows × {len(COLUMNS)} columns ({names}), "
+        f"{ROWS_PER_PAGE} rows per page"
+    )
+    for title, table in (("as placed", orders), ("sorted by name", by_name)):
+        print(f"the first page of each column, orders {title}:")
+        for position, (column, codec) in enumerate(COLUMNS.items()):
+            values = [row[position] for row in table[:ROWS_PER_PAGE]]
+            plain = len(values) * codec.size
+            print(f"  {column}: {plain} bytes plain — {describe(values)}")
+
+
 def main() -> int:
     """Run one demo by name; with no name, print the hello line."""
     parser = argparse.ArgumentParser(prog="nanolance")
@@ -152,12 +192,16 @@ def main() -> int:
     demo.add_argument("folder", type=Path, nargs="?", default=Path("warehouse"))
     demo = demos.add_parser("pages", help="store one table as pages with a footer")
     demo.add_argument("folder", type=Path, nargs="?", default=Path("warehouse"))
+    demo = demos.add_parser("packing", help="pack each page in fewer bytes")
+    demo.add_argument("folder", type=Path, nargs="?", default=Path("warehouse"))
     args = parser.parse_args()
 
     if args.demo == "layouts":
         layouts(args.folder)
     elif args.demo == "pages":
         pages(args.folder)
+    elif args.demo == "packing":
+        packing(args.folder)
     else:
         print(f"nanolance {__version__}: scaffold is alive")
     return 0

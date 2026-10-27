@@ -117,3 +117,32 @@ def test_pages_refuses_a_file_that_is_not_a_page_file(tmp_path):
         r"it ends with b'\x00\x00\x00\x00', not b'NLNC'",
         "  tally: reads 1, bytes read 24, seeks 1",
     ]
+
+
+def run_packing(folder):
+    result = subprocess.run(
+        [sys.executable, "-m", "nanolance", "packing", str(folder)],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.splitlines()
+
+
+def test_packing_shows_what_each_first_page_holds(tmp_path):
+    lines = run_packing(tmp_path)
+    assert lines[:11] == [
+        "the orders table: 1000 rows × 4 columns (id, price, qty, name), "
+        "100 rows per page",
+        "the first page of each column, orders as placed:",
+        "  id: 800 bytes plain — 100 distinct, longest run 1, largest 200 needs 8 bits",
+        "  price: 800 bytes plain — 8 distinct, longest run 1",
+        "  qty: 400 bytes plain — 6 distinct, longest run 1, largest 40 needs 6 bits",
+        "  name: 1200 bytes plain — 8 distinct, longest run 1",
+        "the first page of each column, orders sorted by name:",
+        "  id: 800 bytes plain — 100 distinct, longest run 1, "
+        "largest 893 needs 10 bits",
+        "  price: 800 bytes plain — 1 distinct, longest run 100",
+        "  qty: 400 bytes plain — 1 distinct, longest run 100, largest 3 needs 2 bits",
+        "  name: 1200 bytes plain — 1 distinct, longest run 100",
+    ]
