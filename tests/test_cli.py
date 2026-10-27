@@ -52,3 +52,27 @@ def test_layouts_fetches_one_row_both_ways(tmp_path):
         "fetch row 5 from columns.bin = (106, 3.25, 12, 'nails')",
         "  tally: reads 4, bytes read 32, seeks 4",
     ]
+
+
+def run_pages(folder):
+    result = subprocess.run(
+        [sys.executable, "-m", "nanolance", "pages", str(folder)],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.splitlines()
+
+
+def test_pages_shows_what_the_column_file_must_be_told(tmp_path):
+    lines = run_pages(tmp_path)
+    assert lines[0] == "the orders table: 1000 rows × 4 columns (id, price, qty, name)"
+    start = lines.index("sum(qty) from columns.bin, told 1000 rows = 8125")
+    assert lines[start : start + 6] == [
+        "sum(qty) from columns.bin, told 1000 rows = 8125",
+        "  tally: reads 1, bytes read 4000, seeks 1",
+        "sum(qty) from columns.bin, told 8 rows = 474",
+        "  tally: reads 1, bytes read 32, seeks 1",
+        "qty of rows 10–19 from columns.bin = [40, 2, 1, 12, 4, 2, 3, 1, 40, 2]",
+        "  tally: reads 1, bytes read 4000, seeks 1 (rows 10–19 need only 40 of them)",
+    ]

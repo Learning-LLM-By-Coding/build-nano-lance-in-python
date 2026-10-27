@@ -1,6 +1,6 @@
 from nanolance import column_layout
 from nanolance.counting import CountingFile
-from nanolance.orders import ORDERS, pack_value
+from nanolance.orders import ORDERS, many_orders, pack_value
 
 
 def test_each_column_is_stored_in_one_piece(tmp_path):
@@ -40,3 +40,12 @@ def test_fetching_one_row_visits_every_column(tmp_path):
         with CountingFile(path) as f:
             assert column_layout.fetch_row(f, index, len(ORDERS)) == expected
             assert (f.reads, f.bytes_read, f.seeks) == (4, 32, 4)
+
+
+def test_a_wrong_row_count_reads_the_wrong_bytes_without_error(tmp_path):
+    path = tmp_path / "columns.bin"
+    column_layout.write(path, many_orders(1000))
+    with CountingFile(path) as f:
+        assert column_layout.sum_column(f, "qty", 1000) == 8125
+    with CountingFile(path) as f:
+        assert column_layout.sum_column(f, "qty", 8) == 474  # four ids, not qty

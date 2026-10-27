@@ -56,3 +56,12 @@ def unpack_value(column: str, raw: bytes) -> int | float | str:
     if isinstance(value, bytes):
         value = value.rstrip(b"\0").decode("utf-8")
     return value
+
+
+def many_orders(n_rows: int) -> list[Row]:
+    """Analogy: a busy week — the same eight orders, placed again and again.
+
+    `n_rows` orders with ids 101, 102, 103, ...; order k repeats the price,
+    quantity, and name of ORDERS[k % 8], so every value is predictable.
+    """
+    return [(101 + k, *ORDERS[k % len(ORDERS)][1:]) for k in range(n_rows)]
