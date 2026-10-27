@@ -108,3 +108,12 @@ def test_pages_opens_the_file_from_its_footer(tmp_path):
         "[40, 2, 1, 12, 4, 2, 3, 1, 40, 2]",
         "  tally: reads 3, bytes read 2162, seeks 3",
     ]
+
+
+def test_pages_refuses_a_file_that_is_not_a_page_file(tmp_path):
+    lines = run_pages(tmp_path)
+    assert lines[-2:] == [
+        "open columns.bin as a page file: refused, not a nanolance file: "
+        r"it ends with b'\x00\x00\x00\x00', not b'NLNC'",
+        "  tally: reads 1, bytes read 24, seeks 1",
+    ]

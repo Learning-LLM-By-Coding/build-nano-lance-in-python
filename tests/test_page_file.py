@@ -1,4 +1,6 @@
-from nanolance import page_file
+import pytest
+
+from nanolance import column_layout, page_file
 from nanolance.counting import CountingFile
 from nanolance.orders import COLUMNS, ORDERS, many_orders
 from nanolance.page_file import FOOTER, MAGIC, VERSION, Page
@@ -76,3 +78,52 @@ def test_a_reader_told_nothing_reads_back_every_column(tmp_path):
         for position, (column, codec) in enumerate(metadata.codecs.items()):
             values = page_file.read_column(f, codec, metadata.pages[column])
             assert values == [row[position] for row in orders]
+
+
+def open_metadata(path):
+    with CountingFile(path) as f:
+        return page_file.read_metadata(f)
+
+
+def test_a_day_1_column_file_is_refused_by_name(tmp_path):
+    path = tmp_path / "columns.bin"
+    column_layout.write(path, ORDERS)
+    with pytest.raises(ValueError, match="not a nanolance file: it ends with"):
+        open_metadata(path)
+
+
+def test_a_file_cut_short_by_an_interrupted_write_is_refused(tmp_path):
+    path = tmp_path / "pages.bin"
+    page_file.write(path, many_orders(1000))
+    path.write_bytes(path.read_bytes()[:32000])  # the pages, but no footer
+    with pytest.raises(ValueError, match="not a nanolance file: it ends with"):
+        open_metadata(path)
+
+
+def test_a_file_shorter_than_the_footer_is_refused_without_a_read(tmp_path):
+    path = tmp_path / "tiny.bin"
+    path.write_bytes(b"NLNC")
+    with CountingFile(path) as f:
+        with pytest.raises(ValueError, match="4 bytes is shorter than the 24-byte"):
+            page_file.read_metadata(f)
+        assert (f.reads, f.seeks) == (0, 0)
+
+
+def test_another_version_is_refused(tmp_path):
+    path = tmp_path / "pages.bin"
+    page_file.write(path, ORDERS)
+    data = path.read_bytes()
+    offset, size, _, _ = FOOTER.unpack(data[-FOOTER.size :])
+    path.write_bytes(data[: -FOOTER.size] + FOOTER.pack(offset, size, 2, MAGIC))
+    with pytest.raises(ValueError, match="version 2; this reader reads version 1"):
+        open_metadata(path)
+
+
+def test_a_footer_pointing_outside_the_file_is_refused(tmp_path):
+    path = tmp_path / "pages.bin"
+    page_file.write(path, ORDERS)
+    data = path.read_bytes()
+    offset, _, _, _ = FOOTER.unpack(data[-FOOTER.size :])
+    path.write_bytes(data[: -FOOTER.size] + FOOTER.pack(offset, 10**6, VERSION, MAGIC))
+    with pytest.raises(ValueError, match="damaged nanolance file"):
+        open_metadata(path)

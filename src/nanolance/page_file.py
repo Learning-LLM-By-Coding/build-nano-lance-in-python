@@ -137,11 +137,30 @@ def read_metadata(f: CountingFile) -> Metadata:
     lists it points to.
 
     Two seeks and two reads: the footer (the file's last FOOTER.size
-    bytes), then the column metadata at the offset the footer gives.
+    bytes), then the column metadata at the offset the footer gives. A file
+    without the magic bytes, of another version, or whose footer points
+    outside the file is refused with a ValueError before the second read.
     """
+    if f.size < FOOTER.size:
+        raise ValueError(
+            f"not a nanolance file: {f.size} bytes is shorter than the "
+            f"{FOOTER.size}-byte footer"
+        )
     f.seek(f.size - FOOTER.size)
     footer = f.read(FOOTER.size)
     metadata_offset, metadata_size, version, magic = FOOTER.unpack(footer)
+    if magic != MAGIC:
+        raise ValueError(f"not a nanolance file: it ends with {magic!r}, not {MAGIC!r}")
+    if version != VERSION:
+        raise ValueError(
+            f"nanolance file version {version}; this reader reads version {VERSION}"
+        )
+    footer_start = f.size - FOOTER.size
+    if metadata_offset + metadata_size > footer_start:
+        raise ValueError(
+            f"damaged nanolance file: its metadata would end at byte "
+            f"{metadata_offset + metadata_size}, past the footer at {footer_start}"
+        )
     f.seek(metadata_offset)
     metadata = json.loads(f.read(metadata_size))
     columns = metadata["columns"]

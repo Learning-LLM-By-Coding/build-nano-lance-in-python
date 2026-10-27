@@ -8,7 +8,7 @@ in Python, one tested day at a time.
 This is the **public preview**: Days 0–5 — the file format, from rows and
 columns to random access — are free here, with every checkpoint tag. Days
 6–17 (tables and versions, indexes, the database layer) are the Pro
-edition. **Status: being written — Days 0 and 1 are done.**
+edition. **Status: being written — Days 0, 1, and 2 are done.**
 
 ## Prerequisites
 
@@ -112,7 +112,7 @@ watch every new part change how the old ones behave.
 as part of one running story: a warehouse. A table stored by rows is
 shelving where each customer's order sits together; stored by columns,
 each aisle holds one column's values. Values arrive in sealed boxes, and
-an index card at the back says which aisle and shelf holds each box. So you
+a wall card at the back says which aisle and shelf holds each box. So you
 meet each idea first as something you can picture, and only then as code.
 [The warehouse: an analogy to help you build the right mental model](book/src/story.md)
 keeps the whole story on one page, one scene per finished day: come back
@@ -176,7 +176,7 @@ lives in the book's [introduction](book/src/introduction.md).
 |-----|-------|----------------|--------|
 | 0&nbsp;✅ | Setup: tools and the empty tested scaffold | Install the tools and end with a tested, running (if empty) program. | 0.5&nbsp;h |
 | 1&nbsp;✅ | Rows vs columns | Store one table both ways, and count what a one-column question and a one-row fetch each have to read. | 2&nbsp;h |
-| 2 | A file of pages | Cut each column into pages, write a footer of where everything is, and read one column by jumping straight to it. | 2&nbsp;h |
+| 2&nbsp;✅ | A file of pages | Cut each column into pages, write a footer of where everything is, and read one column by jumping straight to it. | 2&nbsp;h |
 | 3 | Encodings | Store the same values in fewer bytes — dictionaries, runs, packed bits — and prove every value comes back. | 2&nbsp;h |
 | 4 | Strings, lists, and missing values | Values of different lengths, and values that are not there at all. | 2&nbsp;h |
 | 5 | Random access | Fetch row 7,342 without reading the rest — and count how much less that reads than a Parquet-style layout. | 2&nbsp;h |

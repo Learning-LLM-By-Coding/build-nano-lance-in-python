@@ -60,7 +60,7 @@ its exact bytes.
 ## One story holds it all together
 
 Every day adds a scene to one running story — a warehouse — and each
-piece of the format is one thing in it: an aisle, a sealed box, the index
+piece of the format is one thing in it: an aisle, a sealed box, the wall
 card at the back.
 [The warehouse: an analogy to help you build the right mental model](story.md)
 keeps the whole story on one page. Come back to it whenever an earlier
@@ -106,7 +106,7 @@ book is written.
 | 0 | Setup | uv, pytest, ruff, mdBook · the empty tested scaffold | 0.5 h |
 | **Part 1** | **The Lance format** | | |
 | 1 | Rows vs columns | One table stored row by row · a counting file: bytes read for a one-column question · the same table stored column by column · fetching one whole row: where rows win | 2 h |
-| 2 | A file of pages | Column chunks cut into pages · a footer of offsets · read one column by seeking | 2 h |
+| 2 | A file of pages | Day 1's file at a thousand rows · columns cut into pages · metadata and a footer, read from the end · refusing a file by name | 2 h |
 | 3 | Encodings | Plain & dictionary · run-length · bit-packing · bytes saved and round-trip proofs | 2 h |
 | 4 | Strings, lists, and missing values | Offsets buffers · validity bitmaps · lists | 2 h |
 | 5 | Random access | Row id → page · a Parquet-style row-group layout to compare · bytes and seeks counted | 2 h |

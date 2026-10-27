@@ -198,7 +198,7 @@ Walk the warehouse, one station per section:
   for one whole order. With crates, that is one walk and one crate. With
   aisles, it is a stop in every aisle — four walks, four small armfuls.
 
-Here are the two files, byte by byte, as the picker sees them (each box
+Here are the two files, byte by byte, as the picker sees them (each cell
 is one value; the numbers under each file are byte positions):
 
 ```text
@@ -1740,7 +1740,7 @@ starts.
 
 **Tomorrow's limitation, resolved on Day 2:** that last point is the one
 you broke in section 10. On Day 2 the aisles are cut into **sealed
-boxes** — Lance calls them *pages* — and the warehouse gets **the index
+boxes** — Lance calls them *pages* — and the warehouse gets **the wall
 card at the back**: a small record at the very end of the file that says
 where every box lives. A
 reader opens the card first, then walks straight to the boxes it needs,

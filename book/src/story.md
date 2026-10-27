@@ -2,7 +2,7 @@
 
 Every day of this book adds one scene to a single running story: **a
 warehouse.** Each piece of the format you build is one thing in that story
-— an aisle, a sealed box, the index card at the back. Keep the story in
+— an aisle, a sealed box, the wall card at the back. Keep the story in
 your head, and you can always picture what the code is doing, even on the
 days it gets dense.
 
@@ -30,6 +30,7 @@ introduced it, if you want the full explanation again.
 | Day | Scene | Concepts it adds |
 |-----|-------|------------------|
 | 1 | [Crates or aisles](#day-1--crates-or-aisles) | the packing rule, crates, the tally, the stock count, aisles, a customer pickup |
+| 2 | [The wall card at the back](#day-2--the-wall-card-at-the-back) | sealed boxes, the box list, the wall card at the back, the stamp |
 
 ## Day 1 — crates or aisles
 
@@ -102,5 +103,61 @@ aisle. Neither shelving wins everything.
 *What it is:* fetching one row, all its columns, by its position. The row layout does it in one seek and one read; the column layout needs one seek and one read per column. Lance calls fetching rows by position a *take*.
 
 *In the story:* a customer comes to collect one whole order: one crate, or a stop in every aisle.
+
+</div>
+
+## Day 2 — the wall card at the back
+
+A busy week: a thousand orders arrive, and every aisle grows long. A
+picker told the wrong number of orders walks to the wrong spot and
+carries back the wrong bytes without noticing, and ten orders' worth of
+quantities still means carrying the whole aisle. So the warehouse cuts
+every aisle into **sealed boxes** of up to 100 values, and for each aisle
+keeps a **box list**: where each box sits, how much it weighs, how many
+values it holds. The box lists are stored after the last box, and on the
+back wall hangs **the wall card** — always the same size, always last —
+which says where the box lists are. A picker who knows nothing walks to
+the back wall, reads the card, reads the box lists, and carries only the
+boxes the question needs. The card carries **the stamp**, the
+warehouse's name and edition, so a picker sent to the wrong building
+turns around after reading one card.
+
+<div class="concept" id="pages">
+
+**Sealed boxes — pages** · [Day 2, section B](day-02-a-file-of-pages.md#section-b--sealed-boxes-each-column-cut-into-pages)
+
+*What it is:* a run of one column's values — here up to `ROWS_PER_PAGE` = 100 — stored back to back and read in one piece. A question reads only the pages that overlap the rows it asks for. Lance recommends pages of about 8 MB.
+
+*In the story:* each aisle cut into sealed boxes of up to 100 values; the picker carries whole boxes, never half of one, and only the boxes a question needs.
+
+</div>
+
+<div class="concept" id="box-list">
+
+**The box list — column metadata** · [Day 2, section B](day-02-a-file-of-pages.md#section-b--sealed-boxes-each-column-cut-into-pages)
+
+*What it is:* for each column, its value format and one `Page` per page: its offset (first byte), size in bytes, and row count. Section B hands it from the writer to the reader in memory; from section C on it is stored in the file, as JSON, right after the pages. Lance stores it as Protocol Buffers.
+
+*In the story:* one list per aisle — where each box sits, how much it weighs, how many values it holds — kept in the warehouse after the last box.
+
+</div>
+
+<div class="concept" id="wall-card">
+
+**The wall card at the back — the footer** · [Day 2, section C](day-02-a-file-of-pages.md#section-c--the-wall-card-at-the-back)
+
+*What it is:* a fixed-size record (24 bytes, `FOOTER`) at the very end of the file: where the metadata starts, how long it is, the format version, and the magic bytes. Because its size never changes, a reader finds it at the file's size minus 24, and reads it first. It goes last because a writer only knows where everything landed once it is written.
+
+*In the story:* a card of one fixed size on the back wall, the last thing in the warehouse, saying where the box lists are.
+
+</div>
+
+<div class="concept" id="stamp">
+
+**The stamp — magic bytes and a version** · [Day 2, section D](day-02-a-file-of-pages.md#section-d--the-stamp-refusing-a-file-by-name)
+
+*What it is:* the footer's last four bytes, `NLNC`, name the format, and its version field says which edition wrote it. The reader checks both before trusting the footer, and refuses a file that is too short, not ours, of another version, or whose footer points outside it. A file whose writing was interrupted has no footer, so it is refused too. The stamp proves whose file it is — not that its box lists are true.
+
+*In the story:* the warehouse's name and edition, printed on the wall card; a picker at the wrong building turns around after reading one card.
 
 </div>

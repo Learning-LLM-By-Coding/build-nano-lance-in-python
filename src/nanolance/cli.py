@@ -136,6 +136,13 @@ def pages(folder: Path) -> None:
         print(f"qty of rows 10–19 from {pages_path.name}, told nothing = {values}")
         print(f"  tally: {f.tally()}")
 
+    with CountingFile(columns_path) as f:
+        try:
+            page_file.read_metadata(f)
+        except ValueError as error:
+            print(f"open {columns_path.name} as a page file: refused, {error}")
+        print(f"  tally: {f.tally()}")
+
 
 def main() -> int:
     """Run one demo by name; with no name, print the hello line."""
