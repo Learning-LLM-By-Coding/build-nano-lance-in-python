@@ -180,22 +180,24 @@ lives in the book's [introduction](book/src/introduction.md).
 | 3&nbsp;✅ | Encodings | Store the same values in fewer bytes — dictionaries, runs, packed bits — and prove every value comes back. | 2&nbsp;h |
 | 4&nbsp;✅ | Strings, lists, and missing values | Values of different lengths, and values that are not there at all. | 2&nbsp;h |
 | 5&nbsp;✅ | Random access | Fetch row 7,342 without reading the rest — and count how much less that reads than a Parquet-style layout. | 2&nbsp;h |
-| 6 | The table | Many files plus a record of each version: read the table as it was yesterday. | 2&nbsp;h |
-| 7 | Changing data | Append, delete without rewriting, update — and catch two writers colliding. | 2.5&nbsp;h |
-| 8 | Schema evolution | Add a column to a big table without rewriting it; drop one. | 1.5&nbsp;h |
-| 9 | Compaction and cleanup | Merge many small files into a few, and delete versions nobody needs. | 2&nbsp;h |
-| 10 | Scalar indexes | A sorted index and a bitmap index let filters skip most of the table. | 2&nbsp;h |
-| 11 | Vector search | Find the nearest vectors: check every one, then only the few closest clusters — and measure what that costs in recall. | 2.5&nbsp;h |
-| 12 | Product quantization | Store each vector as a few short codes: far less memory, a little less recall, and a refine step to win it back. | 2.5&nbsp;h |
-| 13 | The database | Connect to a folder, create and open tables, add, upsert, delete. | 2&nbsp;h |
-| 14 | The query builder | `search().where().limit()` — and why filtering after the search can quietly return too few results. | 2.5&nbsp;h |
-| 15 | Full-text search | Split text into words, build an inverted index, and rank matches with BM25. | 2&nbsp;h |
-| 16 | Hybrid search | Combine vector and keyword results into one ranking. | 1.5&nbsp;h |
-| 17 | The payoff: semantic search | A tiny built-in embedder, automatic embedding on insert and query, and a small search app checked against real LanceDB. | 3&nbsp;h |
+| 6&nbsp;🔒 | The table | Many files plus a record of each version: read the table as it was yesterday. | 2&nbsp;h |
+| 7&nbsp;🔒 | Changing data | Append, delete without rewriting, update — and catch two writers colliding. | 2.5&nbsp;h |
+| 8&nbsp;🔒 | Schema evolution | Add a column to a big table without rewriting it; drop one. | 1.5&nbsp;h |
+| 9&nbsp;🔒 | Compaction and cleanup | Merge many small files into a few, and delete versions nobody needs. | 2&nbsp;h |
+| 10&nbsp;🔒 | Scalar indexes | A sorted index and a bitmap index let filters skip most of the table. | 2&nbsp;h |
+| 11&nbsp;🔒 | Vector search | Find the nearest vectors: check every one, then only the few closest clusters — and measure what that costs in recall. | 2.5&nbsp;h |
+| 12&nbsp;🔒 | Product quantization | Store each vector as a few short codes: far less memory, a little less recall, and a refine step to win it back. | 2.5&nbsp;h |
+| 13&nbsp;🔒 | The database | Connect to a folder, create and open tables, add, upsert, delete. | 2&nbsp;h |
+| 14&nbsp;🔒 | The query builder | `search().where().limit()` — and why filtering after the search can quietly return too few results. | 2.5&nbsp;h |
+| 15&nbsp;🔒 | Full-text search | Split text into words, build an inverted index, and rank matches with BM25. | 2&nbsp;h |
+| 16&nbsp;🔒 | Hybrid search | Combine vector and keyword results into one ranking. | 1.5&nbsp;h |
+| 17&nbsp;🔒 | The payoff: semantic search | A tiny built-in embedder, automatic embedding on insert and query, and a small search app checked against real LanceDB. | 3&nbsp;h |
 
 ✅ = finished — the day's chapter and checkpoint tags are in this repository.
-Days 6–17 = the Pro edition, still being written (launching soon — star or
-watch this repository to catch it).
+
+✅&#8288;🔒 = finished, in the Pro edition (launching soon — star or watch this repository to catch it).
+
+🔒 = Pro edition, still being written.
 
 ## How to follow the course
 
