@@ -168,7 +168,7 @@ bytes, reads, and recall.
 
 ## The 18 days
 
-Roughly 35 hours end to end. Day boundaries will be refined as the book is
+Roughly 38 hours end to end. Day boundaries will be refined as the book is
 written. Each day is one theme built as two to four related sections, and
 every section ends at a runnable, tagged checkpoint — the per-section plan
 lives in the book's [introduction](book/src/introduction.md).

@@ -127,7 +127,7 @@ book is written.
 | 16 | Hybrid search | Vector + keyword results · reciprocal rank fusion | 1.5 h |
 | 17 | The payoff: semantic search | A tiny offline embedder · embedding on insert and query · a search app refereed against LanceDB | 3 h |
 
-Roughly 35 hours end to end. Days 0–5 are the free public preview; Days
+Roughly 38 hours end to end. Days 0–5 are the free public preview; Days
 6–17 are the Pro edition.
 
 Two rules keep the course honest:
