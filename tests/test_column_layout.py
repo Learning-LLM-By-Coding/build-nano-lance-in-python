@@ -31,3 +31,12 @@ def test_summing_one_column_reads_only_that_column(tmp_path):
     with CountingFile(path) as f:
         assert column_layout.sum_column(f, "qty", len(ORDERS)) == 65
         assert (f.reads, f.bytes_read, f.seeks) == (1, 32, 1)
+
+
+def test_fetching_one_row_visits_every_column(tmp_path):
+    path = tmp_path / "columns.bin"
+    column_layout.write(path, ORDERS)
+    for index, expected in enumerate(ORDERS):
+        with CountingFile(path) as f:
+            assert column_layout.fetch_row(f, index, len(ORDERS)) == expected
+            assert (f.reads, f.bytes_read, f.seeks) == (4, 32, 4)

@@ -52,6 +52,16 @@ def layouts(folder: Path) -> None:
         print(f"sum(qty) from {columns_path.name} = {total}")
         print(f"  tally: {f.tally()}")
 
+    index = 5
+    with CountingFile(rows_path) as f:
+        row = row_layout.fetch_row(f, index)
+        print(f"fetch row {index} from {rows_path.name} = {row}")
+        print(f"  tally: {f.tally()}")
+    with CountingFile(columns_path) as f:
+        row = column_layout.fetch_row(f, index, n_rows)
+        print(f"fetch row {index} from {columns_path.name} = {row}")
+        print(f"  tally: {f.tally()}")
+
 
 def main() -> int:
     """Run one demo by name; with no name, print the hello line."""

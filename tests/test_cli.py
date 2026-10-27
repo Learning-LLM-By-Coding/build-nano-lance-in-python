@@ -42,3 +42,13 @@ def test_layouts_stores_the_table_as_columns_too(tmp_path):
         "sum(qty) from columns.bin = 65",
         "  tally: reads 1, bytes read 32, seeks 1",
     ]
+
+
+def test_layouts_fetches_one_row_both_ways(tmp_path):
+    lines = run_layouts(tmp_path)
+    assert lines[-4:] == [
+        "fetch row 5 from rows.bin = (106, 3.25, 12, 'nails')",
+        "  tally: reads 1, bytes read 32, seeks 1",
+        "fetch row 5 from columns.bin = (106, 3.25, 12, 'nails')",
+        "  tally: reads 4, bytes read 32, seeks 4",
+    ]

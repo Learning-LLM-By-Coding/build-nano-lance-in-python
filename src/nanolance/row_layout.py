@@ -43,3 +43,12 @@ def sum_column(f: BinaryIO, column: str, n_rows: int) -> int | float:
     """
     position = list(COLUMNS).index(column)
     return sum(row[position] for row in read_all(f, n_rows))
+
+
+def fetch_row(f: BinaryIO, index: int) -> Row:
+    """Analogy: a customer collects one order — walk to its crate, lift it.
+
+    Row `index` starts index × ROW_WIDTH bytes in: one seek, one read.
+    """
+    f.seek(index * ROW_WIDTH)
+    return read_row(f)

@@ -28,3 +28,12 @@ def test_summing_one_column_reads_every_byte(tmp_path):
     with CountingFile(path) as f:
         assert row_layout.sum_column(f, "qty", len(ORDERS)) == 65
         assert (f.reads, f.bytes_read, f.seeks) == (8, 256, 0)
+
+
+def test_fetching_one_row_is_one_seek_and_one_read(tmp_path):
+    path = tmp_path / "rows.bin"
+    row_layout.write(path, ORDERS)
+    for index, expected in enumerate(ORDERS):
+        with CountingFile(path) as f:
+            assert row_layout.fetch_row(f, index) == expected
+            assert (f.reads, f.bytes_read, f.seeks) == (1, 32, 1)

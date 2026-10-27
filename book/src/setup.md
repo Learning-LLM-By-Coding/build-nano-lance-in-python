@@ -91,7 +91,8 @@ Installed 7 packages in 7ms
 nanolance 0.1.0: scaffold is alive
 ```
 
-(The two `file:///…` paths are the folder you cloned into, shortened here.)
+(Throughout this book, paths into your clone are shortened to `…` like
+this; yours show the folder you cloned into.)
 
 If you see `nanolance 0.1.0: scaffold is alive`, your tools work and every
 later day will run. (If you skip the `git switch` and run straight from
@@ -234,7 +235,7 @@ nanolance 0.1.0: scaffold is alive
 GREEN: all gates passed
 ```
 
-(The book path is shortened here; yours shows your clone's folder.)
+(The book path is shortened, as everywhere in this book.)
 
 Read it line by line (the first gate, `uv sync`, runs quietly and prints
 nothing when all is well):

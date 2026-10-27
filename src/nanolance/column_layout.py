@@ -58,3 +58,16 @@ def sum_column(f: BinaryIO, column: str, n_rows: int) -> int | float:
     Add up one column's values, reading only that column.
     """
     return sum(read_column(f, column, n_rows))
+
+
+def fetch_row(f: BinaryIO, index: int, n_rows: int) -> Row:
+    """Analogy: a customer collects one order — one stop in every aisle.
+
+    Value `index` of each column sits `index` values into that column, so
+    one row costs one seek and one small read per column.
+    """
+    values = []
+    for column, codec in COLUMNS.items():
+        f.seek(column_start(column, n_rows) + index * codec.size)
+        values.append(unpack_value(column, f.read(codec.size)))
+    return tuple(values)
