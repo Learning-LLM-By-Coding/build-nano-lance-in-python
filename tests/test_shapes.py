@@ -2,7 +2,7 @@ import pytest
 
 from nanolance import shapes
 from nanolance.orders import COLUMNS, TAGGED_ORDERS
-from nanolance.shapes import OFFSET, STRING
+from nanolance.shapes import OFFSET, STRING, STRING_LIST
 
 
 def offsets_of(*ends):
@@ -56,4 +56,31 @@ def test_fixed_width_text_is_still_refused_when_too_long():
 
 def test_a_kind_is_recorded_by_its_format():
     assert shapes.kind_of(shapes.format_of(STRING)) == STRING
+    assert shapes.kind_of(shapes.format_of(STRING_LIST)) == STRING_LIST
     assert shapes.kind_of(shapes.format_of(COLUMNS["id"])).format == "<q"
+
+
+def test_a_list_is_offsets_into_its_items():
+    trays = shapes.list_trays([["bulk"], [], ["a", ""]])
+    assert trays == {
+        "list offsets": offsets_of(0, 1, 1, 3),  # counted in items
+        "offsets": offsets_of(0, 4, 5, 5),  # counted in bytes
+        "data": b"bulka",
+    }
+
+
+LIST_PAGES = {
+    "no lists": [],
+    "only empty lists": [[], [], []],
+    "an empty list and a list of one empty string": [[], [""], ["", ""]],
+    "unicode tags": [["fragile", "très fragile"], ["螺丝"]],
+    "a list of 1000 tags": [[f"tag {k}" for k in range(1000)]],
+    "the shop's tags": [row[4] for row in TAGGED_ORDERS],
+}
+
+
+@pytest.mark.parametrize("values", LIST_PAGES.values(), ids=LIST_PAGES.keys())
+def test_lists_give_back_exactly_what_went_in(values):
+    trays = shapes.trays(STRING_LIST, values)
+    assert list(trays) == ["list offsets", "offsets", "data"]
+    assert shapes.values_from(STRING_LIST, trays) == values

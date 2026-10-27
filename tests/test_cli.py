@@ -246,3 +246,21 @@ def test_shapes_stores_names_as_strings(tmp_path):
         "  padded.bin: 'drill bits' — tally: reads 1, bytes read 12, seeks 1",
         "  strings.bin: 'drill bits' — tally: reads 2, bytes read 18, seeks 2",
     ]
+
+
+def test_shapes_stores_tags_as_lists(tmp_path):
+    lines = run_shapes(tmp_path)
+    start = lines.index("the shop's tags as one box of lists, tray by tray:")
+    assert lines[start : start + 9] == [
+        "the shop's tags as one box of lists, tray by tray:",
+        "  list offsets: [0, 1, 1, 3, 3, 4, 5, 5, 7]",
+        "  offsets: [0, 4, 8, 19, 26, 30, 34, 41]",
+        "  data: b'bulkbulksmall partsfragilebulkgiftfragile'",
+        "tags of 1000 shop orders: 875 tags, 375 empty lists",
+        "  tags.bin: 12705 bytes = "
+        "list offsets plain 4040 + offsets plain 3540 + data plain 5125",
+        "    read back, told nothing: same as the table? True",
+        "  tags-smallest.bin: 6465 bytes = list offsets bit-packed 900 + "
+        "offsets bit-packed 1065 + data bit-packed 4500",
+        "    read back, told nothing: same as the table? True",
+    ]

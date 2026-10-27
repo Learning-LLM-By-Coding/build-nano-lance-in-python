@@ -4,7 +4,7 @@ fixed-size compartments, so the packer's methods still work on every tray.
 Variable-length values. A page that holds them is stored as several
 buffers ("trays"), each one a run of fixed-width values that Day 3's
 encodings can pack: OFFSET-wide positions, and BYTE-wide UTF-8 text. Strings
-follow Apache Arrow's variable-size binary layout.
+and lists follow Apache Arrow's variable-size binary and list layouts.
 """
 
 import struct
@@ -15,18 +15,20 @@ OFFSET = struct.Struct("<I")
 # One byte of UTF-8 text.
 BYTE = struct.Struct("<B")
 
-# The name a variable-length text column records as its format.
+# The names variable-length columns record as their format: text, and a
+# list of texts per row.
 STRING = "string"
+STRING_LIST = "list<string>"
 
 # A column's kind: a fixed-width codec (Days 1–3), or the name of a
 # variable-length kind.
 Kind = struct.Struct | str
-Value = int | float | str
+Value = int | float | str | list[str]
 
 
 def kind_of(format_name: str) -> Kind:
     """The column kind a metadata "format" names."""
-    if format_name == STRING:
+    if format_name in (STRING, STRING_LIST):
         return format_name
     return struct.Struct(format_name)
 
@@ -70,6 +72,26 @@ def strings_from(trays: dict[str, bytes]) -> list[str]:
     return [data[start:stop].decode("utf-8") for start, stop in spans(trays["offsets"])]
 
 
+def list_trays(values: list[list[str]]) -> dict[str, bytes]:
+    """Analogy: bundles — each order's tags tied together, every bundle's
+    tags on one letter strip, and a mark where each bundle ends.
+
+    Three trays: "list offsets" (len(values) + 1 of them, counted in items),
+    then every item of every list, stored as string_trays stores strings.
+    """
+    items = [item for value in values for item in value]
+    return {
+        "list offsets": offsets([len(value) for value in values]),
+        **string_trays(items),
+    }
+
+
+def lists_from(trays: dict[str, bytes]) -> list[list[str]]:
+    """The lists back: the items first, then cut by the list offsets."""
+    items = strings_from(trays)
+    return [items[start:stop] for start, stop in spans(trays["list offsets"])]
+
+
 def fixed_tray(codec: struct.Struct, values: list[Value]) -> bytes:
     """Analogy: Day 1's packing rule, for any compartment size.
 
@@ -102,16 +124,19 @@ def trays(kind: Kind, values: list[Value]) -> dict[str, bytes]:
     """Analogy: lay out one box's trays before the packer packs each one.
 
     One page's values as plain trays, by name: a fixed-width column has one,
-    "values"; a string column has "offsets" and "data".
+    "values"; a string column has "offsets" and "data"; a list column has
+    "list offsets" before those two.
     """
     if kind == STRING:
         return string_trays(values)
+    if kind == STRING_LIST:
+        return list_trays(values)
     return {"values": fixed_tray(kind, values)}
 
 
 def tray_codec(kind: Kind, name: str) -> struct.Struct:
     """The fixed width of one tray's values, which its encoding works on."""
-    if name == "offsets":
+    if name in ("list offsets", "offsets"):
         return OFFSET
     if name == "data":
         return BYTE
@@ -122,4 +147,6 @@ def values_from(kind: Kind, trays: dict[str, bytes]) -> list[Value]:
     """One page's values back from its decoded (plain) trays."""
     if kind == STRING:
         return strings_from(trays)
+    if kind == STRING_LIST:
+        return lists_from(trays)
     return fixed_values(kind, trays["values"])

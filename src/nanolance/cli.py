@@ -16,10 +16,11 @@ from nanolance.orders import (
     TAGGED_ORDERS,
     Row,
     many_orders,
+    many_tagged_orders,
     pack_value,
 )
 from nanolance.page_file import ROWS_PER_PAGE, Page
-from nanolance.shapes import STRING, fixed_values
+from nanolance.shapes import OFFSET, STRING, STRING_LIST, fixed_values, list_trays
 
 
 def layouts(folder: Path) -> None:
@@ -386,6 +387,28 @@ def shapes(folder: Path) -> None:
     with CountingFile(strings_path) as f:
         name = page_file.read_string(f, strings["name"][0], k)
         print(f"  {strings_path.name}: {name!r} — tally: {f.tally()}")
+
+    print("the shop's tags as one box of lists, tray by tray:")
+    trays = list_trays([row[4] for row in TAGGED_ORDERS])
+    for tray in ("list offsets", "offsets"):
+        print(f"  {tray}: {[end for (end,) in OFFSET.iter_unpack(trays[tray])]}")
+    print(f"  data: {trays['data']}")
+    tagged = many_tagged_orders(1000)
+    tags = [(row[4],) for row in tagged]
+    n_tags = sum(len(row[4]) for row in tagged)
+    n_empty = sum(not row[4] for row in tagged)
+    print(f"tags of {len(tagged)} shop orders: {n_tags} tags, {n_empty} empty lists")
+    for path, encoding in (
+        (folder / "tags.bin", {}),
+        (folder / "tags-smallest.bin", {"tags": "smallest"}),
+    ):
+        boxes = page_file.write(
+            path, tags, encoding=encoding, columns={"tags": STRING_LIST}
+        )
+        stored = sum(page.size for page in boxes["tags"])
+        print(f"  {path.name}: {stored} bytes = {tray_bytes(boxes['tags'])}")
+        same = read_back(path) == tags
+        print(f"    read back, told nothing: same as the table? {same}")
 
 
 def main() -> int:

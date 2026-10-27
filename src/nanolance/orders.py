@@ -86,3 +86,14 @@ def many_orders(n_rows: int) -> list[Row]:
     quantity, and name of ORDERS[k % 8], so every value is predictable.
     """
     return [(101 + k, *ORDERS[k % len(ORDERS)][1:]) for k in range(n_rows)]
+
+
+def many_tagged_orders(n_rows: int) -> list[TaggedRow]:
+    """Analogy: a busy week of the shop's real orders.
+
+    `n_rows` orders with ids 101, 102, 103, ...; order k repeats the price,
+    quantity, name, and tags of TAGGED_ORDERS[k % 8].
+    """
+    return [
+        (101 + k, *TAGGED_ORDERS[k % len(TAGGED_ORDERS)][1:]) for k in range(n_rows)
+    ]
