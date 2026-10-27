@@ -23,6 +23,61 @@ days explain what an embedding is when they need one, and the math is never
 required to progress. No GPU is needed, ever, and the tests never touch the
 network.
 
+## Why Lance?
+
+[Lance](https://github.com/lance-format/lance) is an open-source columnar
+format built for machine-learning data: tables of text, images, and
+embeddings that a training job reads in random order and a search service
+queries by similarity. [LanceDB](https://github.com/lancedb/lancedb) is the
+embedded vector database built on top of it. Both are Apache-2.0.
+
+- **Data layout is the quiet half of ML performance.** A training job that
+  waits on its data loader, a search that reads ten times the bytes it
+  needs, a table that grows slower with every small append — these are
+  layout problems, not model problems. Lance is a clear, modern answer to
+  them, and its ideas (columns, pages, footers, versioned manifests,
+  vector indexes) are the same ones inside Parquet, Delta Lake, Iceberg,
+  and every vector database.
+
+- **Lance's answers are small enough to build.** A file of column pages with
+  an index at the end; a table that is a list of files plus a manifest per
+  version; an index that reads a few clusters instead of everything. Each
+  one fits in your head once you have typed it yourself.
+
+- **Using a format teaches its options; building one teaches its
+  physics.** After you have written the footer, the deletion file, and the
+  vector index with your own hands, "why is this query slow?" stops being
+  a guess: you can say how many bytes it should read, and why.
+
+## Why Python?
+
+Fair question — Lance itself is written mostly in Rust (about four-fifths
+of its code by GitHub's language count when this course began). Three
+honest reasons this course uses Python anyway:
+
+- **The lessons are about layout and I/O, not language.** Which bytes sit
+  next to which, how many reads a query needs, what a version records —
+  those answers are the same in any language. Python keeps the code short
+  enough that the layout stays visible.
+
+- **This is where Lance's users already live.** Most people meet Lance
+  through its Python packages (`pylance`, `lancedb`) in a notebook or a
+  data pipeline. Building it in the same language means the course ends
+  next to the tools you already use — and lets the real packages referee
+  your results.
+
+- **We measure bytes and reads, not milliseconds.** Python is slower than
+  Rust, so wall-clock timings would mostly measure the interpreter. Instead,
+  every "faster" claim in this course is a count: bytes read, reads issued,
+  pages touched — taken by a small file wrapper that counts every read. A
+  count is honest in any language. Timings appear only as a secondary,
+  clearly caveated number.
+
+And where Rust really wins, the book says so: real Lance reads data without
+copying it, computes vector distances with SIMD instructions, and talks to
+cloud object stores with asynchronous I/O. Those are speed wins on top of
+the same layout ideas — this course teaches the ideas.
+
 ## Why this course?
 
 Knowing what each part of a data format does is not the same as knowing
