@@ -13,9 +13,10 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import BinaryIO
 
-from nanolance import encodings
+from nanolance import encodings, shapes
 from nanolance.counting import CountingFile
 from nanolance.orders import COLUMNS, Row, pack_value
+from nanolance.shapes import OFFSET, Kind, Value
 
 ROWS_PER_PAGE = 100
 
@@ -26,7 +27,23 @@ ROWS_PER_PAGE = 100
 # version (4 bytes), and the magic bytes that name the format (4 bytes).
 FOOTER = struct.Struct("<QQI4s")
 MAGIC = b"NLNC"
-VERSION = 2  # 2: every page records its encoding
+VERSION = 3  # 3: a page may hold several trays
+
+
+@dataclass(frozen=True)
+class Tray:
+    """Analogy: one tray inside a box — what it holds, how many bytes it
+    weighs, how many compartments it has, and its own packing note.
+
+    One buffer of a page: `name` says what it holds ("offsets", "data", ...),
+    `size` is its length in bytes as stored, `count` the number of
+    fixed-width values in it, `encoding` how those values are stored.
+    """
+
+    name: str
+    size: int
+    count: int
+    encoding: str = "plain"
 
 
 @dataclass(frozen=True)
@@ -37,12 +54,15 @@ class Page:
     `offset` is the page's first byte in the file, `size` its length in
     bytes, `rows` the number of values in it, `encoding` the name of the
     encoding its bytes are stored in (version 1 files had only plain pages).
+    A page of several buffers has encoding "trays" and lists them in `trays`,
+    stored back to back from `offset`; a one-buffer page has no `trays`.
     """
 
     offset: int
     size: int
     rows: int
     encoding: str = "plain"
+    trays: tuple[Tray, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -56,7 +76,7 @@ class Metadata:
 
     version: int
     rows: int
-    codecs: dict[str, struct.Struct]
+    codecs: dict[str, Kind]
     pages: dict[str, list[Page]]
 
 
@@ -78,31 +98,66 @@ def plain_pages(
     ]
 
 
+def pack(name: str, codec: struct.Struct, plain: bytes) -> tuple[str, bytes]:
+    """Encode plain bytes with the encoding called `name`, or with the
+    smallest one when `name` is "smallest"; returns the encoding used."""
+    if name == "smallest":
+        return encodings.smallest(codec, plain)
+    return name, encodings.encode(name, codec, plain)
+
+
+def pack_page(
+    kind: Kind, name: str, values: list[Value], offset: int
+) -> tuple[Page, bytes]:
+    """Analogy: the packer fills one box — tray by tray, when it has trays.
+
+    One page's values as stored bytes, and its Page for the metadata. A page
+    with one buffer is stored as on Day 3; a page with several trays stores
+    them back to back, each packed by `name` on its own.
+    """
+    plain_trays = shapes.trays(kind, values)
+    if list(plain_trays) == ["values"]:  # one buffer: a page as on Day 3
+        used, data = pack(name, kind, plain_trays["values"])
+        return Page(offset, len(data), len(values), used), data
+    trays, parts = [], []
+    for tray_name, plain in plain_trays.items():
+        codec = shapes.tray_codec(kind, tray_name)
+        used, stored = pack(name, codec, plain)
+        trays.append(Tray(tray_name, len(stored), len(plain) // codec.size, used))
+        parts.append(stored)
+    data = b"".join(parts)
+    return Page(offset, len(data), len(values), "trays", tuple(trays)), data
+
+
+def entry(page: Page) -> dict:
+    """A page as its metadata records it; a one-buffer page as on Day 3."""
+    fields = asdict(page)
+    if not page.trays:
+        del fields["trays"]
+    return fields
+
+
 def write(
     path: Path,
-    rows: list[Row],
+    rows: list[tuple],
     rows_per_page: int = ROWS_PER_PAGE,
     encoding: dict[str, str] | None = None,
+    columns: dict[str, Kind] = COLUMNS,
 ) -> dict[str, list[Page]]:
     """Write `rows` column by column, each column cut into pages of up to
-    `rows_per_page` values. `encoding` names an encoding per column (a
-    column it leaves out is stored plain); "smallest" picks, page by page,
-    whichever encoding gives the fewest bytes. Returns every column's pages."""
+    `rows_per_page` values; `columns` gives each column's kind, in row order.
+    `encoding` names an encoding per column (a column it leaves out is stored
+    plain); "smallest" picks, page by page, whichever encoding gives the
+    fewest bytes. Returns every column's pages."""
     chosen = encoding or {}
     pages: dict[str, list[Page]] = {}
     with open(path, "wb") as out:
-        for column, codec in COLUMNS.items():
+        for position, (column, kind) in enumerate(columns.items()):
             pages[column] = []
             name = chosen.get(column, "plain")
-            for plain in plain_pages(rows, column, rows_per_page):
-                if name == "smallest":
-                    used, data = encodings.smallest(codec, plain)
-                else:
-                    used, data = name, encodings.encode(name, codec, plain)
-                n_rows = len(plain) // codec.size
-                page = Page(
-                    offset=out.tell(), size=len(data), rows=n_rows, encoding=used
-                )
+            for first in range(0, len(rows), rows_per_page):
+                values = [row[position] for row in rows[first : first + rows_per_page]]
+                page, data = pack_page(kind, name, values, out.tell())
                 pages[column].append(page)
                 out.write(data)
 
@@ -111,10 +166,10 @@ def write(
             "columns": [
                 {
                     "name": column,
-                    "format": codec.format,
-                    "pages": [asdict(page) for page in pages[column]],
+                    "format": shapes.format_of(kind),
+                    "pages": [entry(page) for page in pages[column]],
                 }
-                for column, codec in COLUMNS.items()
+                for column, kind in columns.items()
             ],
         }
         raw = json.dumps(metadata, separators=(",", ":")).encode("utf-8")
@@ -124,22 +179,49 @@ def write(
     return pages
 
 
-def read_page(f: BinaryIO, codec: struct.Struct, page: Page) -> list[int | float | str]:
+def read_page(f: BinaryIO, codec: Kind, page: Page) -> list[Value]:
     """Analogy: walk to one box, carry it back whole, and unpack it the way
-    its packing note says.
+    its packing note says — tray by tray, when it has trays.
 
-    One seek, one read of `page.size` bytes, decoded by the page's encoding
-    back to plain bytes, then cut into values by `codec`.
+    One seek, one read of `page.size` bytes. A one-buffer page is decoded by
+    the page's encoding and cut into values by `codec`; a page of trays has
+    each tray decoded by its own encoding, then its values rebuilt.
     """
     f.seek(page.offset)
     raw = f.read(page.size)
-    plain = encodings.decode(page.encoding, codec, raw, page.rows)
-    values = []
-    for (value,) in codec.iter_unpack(plain):
-        if isinstance(value, bytes):
-            value = value.rstrip(b"\0").decode("utf-8")
-        values.append(value)
-    return values
+    if not page.trays:
+        plain = encodings.decode(page.encoding, codec, raw, page.rows)
+        return shapes.fixed_values(codec, plain)
+    trays = {}
+    start = 0
+    for tray in page.trays:
+        stored = raw[start : start + tray.size]
+        start += tray.size
+        tray_codec = shapes.tray_codec(codec, tray.name)
+        trays[tray.name] = encodings.decode(
+            tray.encoding, tray_codec, stored, tray.count
+        )
+    return shapes.values_from(codec, trays)
+
+
+def read_string(f: BinaryIO, page: Page, k: int) -> str:
+    """Analogy: fetch one name without carrying the box — read its two end
+    marks first, then only its letters.
+
+    Two seeks and two reads: offsets k and k + 1 from the page's "offsets"
+    tray, then the bytes between them from its "data" tray. Both trays must
+    be stored plain, so where offset k sits is arithmetic.
+    """
+    starts, at = {}, page.offset
+    for tray in page.trays:
+        if tray.name in ("offsets", "data") and tray.encoding != "plain":
+            raise ValueError(f"the {tray.name} tray is {tray.encoding}, not plain")
+        starts[tray.name] = at
+        at += tray.size
+    f.seek(starts["offsets"] + k * OFFSET.size)
+    start, stop = (end for (end,) in OFFSET.iter_unpack(f.read(2 * OFFSET.size)))
+    f.seek(starts["data"] + start)
+    return f.read(stop - start).decode("utf-8")
 
 
 def read_column(
@@ -176,7 +258,8 @@ def read_metadata(f: CountingFile) -> Metadata:
     bytes), then the column metadata at the offset the footer gives. A file
     without the magic bytes, of a version this reader does not know, or whose
     footer points outside the file is refused with a ValueError before the
-    second read. Version 1 files read as files whose pages are all plain.
+    second read. Version 1 files read as files whose pages are all plain, and
+    versions 1 and 2 as files without trays.
     """
     if f.size < FOOTER.size:
         raise ValueError(
@@ -205,6 +288,12 @@ def read_metadata(f: CountingFile) -> Metadata:
     return Metadata(
         version=version,
         rows=metadata["rows"],
-        codecs={c["name"]: struct.Struct(c["format"]) for c in columns},
-        pages={c["name"]: [Page(**page) for page in c["pages"]] for c in columns},
+        codecs={c["name"]: shapes.kind_of(c["format"]) for c in columns},
+        pages={c["name"]: [page_from(page) for page in c["pages"]] for c in columns},
     )
+
+
+def page_from(fields: dict) -> Page:
+    """A page from its metadata entry; entries without trays get none."""
+    trays = tuple(Tray(**tray) for tray in fields.pop("trays", []))
+    return Page(**fields, trays=trays)

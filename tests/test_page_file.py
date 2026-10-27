@@ -4,8 +4,9 @@ import pytest
 
 from nanolance import column_layout, page_file
 from nanolance.counting import CountingFile
-from nanolance.orders import COLUMNS, ORDERS, many_orders
-from nanolance.page_file import FOOTER, MAGIC, VERSION, Page
+from nanolance.orders import COLUMNS, ORDERS, TAGGED_ORDERS, many_orders
+from nanolance.page_file import FOOTER, MAGIC, VERSION, Page, Tray
+from nanolance.shapes import STRING
 
 
 def test_each_column_is_cut_into_pages(tmp_path):
@@ -116,9 +117,9 @@ def test_another_version_is_refused(tmp_path):
     page_file.write(path, ORDERS)
     data = path.read_bytes()
     offset, size, _, _ = FOOTER.unpack(data[-FOOTER.size :])
-    path.write_bytes(data[: -FOOTER.size] + FOOTER.pack(offset, size, 3, MAGIC))
+    path.write_bytes(data[: -FOOTER.size] + FOOTER.pack(offset, size, 4, MAGIC))
     with pytest.raises(
-        ValueError, match="version 3; this reader reads versions 1 to 2"
+        ValueError, match="version 4; this reader reads versions 1 to 3"
     ):
         open_metadata(path)
 
@@ -183,3 +184,50 @@ def test_smallest_can_pack_each_page_of_a_column_differently(tmp_path):
         metadata = page_file.read_metadata(f)
         qty = page_file.read_column(f, metadata.codecs["qty"], metadata.pages["qty"])
     assert qty == [row[2] for row in rows]
+
+
+def test_a_string_page_holds_two_trays_back_to_back(tmp_path):
+    path = tmp_path / "names.bin"
+    names = [(row[3],) for row in TAGGED_ORDERS]  # 54 bytes of letters
+    pages = page_file.write(path, names, columns={"name": STRING})
+    trays = (Tray("offsets", 36, 9), Tray("data", 54, 54))
+    assert pages["name"] == [Page(0, 90, 8, "trays", trays)]
+    with CountingFile(path) as f:
+        metadata = page_file.read_metadata(f)
+        assert metadata.codecs == {"name": STRING}
+        assert metadata.pages == pages
+        assert page_file.read_column(f, STRING, pages["name"]) == [n for (n,) in names]
+
+
+def test_one_string_costs_two_reads_its_offsets_then_its_bytes(tmp_path):
+    path = tmp_path / "names.bin"
+    names = [(row[3],) for row in TAGGED_ORDERS]
+    page = page_file.write(path, names, columns={"name": STRING})["name"][0]
+    with CountingFile(path) as f:
+        assert page_file.read_string(f, page, 4) == "drill bits Ø6"
+        assert (f.reads, f.bytes_read, f.seeks) == (2, 8 + 14, 2)
+
+
+def test_one_string_needs_plain_trays(tmp_path):
+    path = tmp_path / "names.bin"
+    names = [(row[3],) for row in TAGGED_ORDERS]
+    pages = page_file.write(
+        path, names, encoding={"name": "bit-packed"}, columns={"name": STRING}
+    )
+    with CountingFile(path) as f:
+        with pytest.raises(ValueError, match="the offsets tray is bit-packed"):
+            page_file.read_string(f, pages["name"][0], 4)
+
+
+def test_a_version_2_file_still_reads(tmp_path):
+    path = tmp_path / "pages.bin"
+    orders = many_orders(1000)
+    page_file.write(path, orders, encoding={c: "smallest" for c in COLUMNS})
+    data = path.read_bytes()
+    offset, size, _, _ = FOOTER.unpack(data[-FOOTER.size :])
+    path.write_bytes(data[: -FOOTER.size] + FOOTER.pack(offset, size, 2, MAGIC))
+    with CountingFile(path) as f:
+        metadata = page_file.read_metadata(f)
+        assert metadata.version == 2
+        names = page_file.read_column(f, COLUMNS["name"], metadata.pages["name"])
+    assert names == [row[3] for row in orders]

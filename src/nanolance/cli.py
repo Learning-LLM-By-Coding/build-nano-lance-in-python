@@ -19,6 +19,7 @@ from nanolance.orders import (
     pack_value,
 )
 from nanolance.page_file import ROWS_PER_PAGE, Page
+from nanolance.shapes import STRING, fixed_values
 
 
 def layouts(folder: Path) -> None:
@@ -289,6 +290,30 @@ def packing(folder: Path) -> None:
             ask_qty(path, start, stop)
 
 
+def read_back(path: Path) -> list[tuple]:
+    """Analogy: a picker who knows nothing unpacks every box of every aisle.
+
+    Every row of a page file, read using only the file.
+    """
+    with CountingFile(path) as f:
+        metadata = page_file.read_metadata(f)
+        columns = [
+            page_file.read_column(f, kind, metadata.pages[column])
+            for column, kind in metadata.codecs.items()
+        ]
+    return list(zip(*columns, strict=True))
+
+
+def tray_bytes(boxes: list[Page]) -> str:
+    """The bytes of one column's trays, by tray and packing note, e.g.
+    "offsets plain 4040 + data plain 6250"."""
+    totals = Counter()
+    for page in boxes:
+        for tray in page.trays:
+            totals[f"{tray.name} {tray.encoding}"] += tray.size
+    return " + ".join(f"{tray} {size}" for tray, size in totals.items())
+
+
 def shapes(folder: Path) -> None:
     """Analogy: the shop's real orders reach the packer's bench — a name too
     long for its compartment, short names rattling in theirs, and prices
@@ -323,6 +348,44 @@ def shapes(folder: Path) -> None:
         f"  and the average price is {average:.2f}; "
         f"the {len(known)} known prices average {sum(known) / len(known):.2f}"
     )
+
+    every_column = {column: "smallest" for column in COLUMNS}
+    in_slots = sum(
+        len(encodings.smallest(COLUMNS["name"], page)[1])
+        for page in page_file.plain_pages(orders, "name")
+    )
+    print(f"the same names as strings (in slots: plain {slots}, smallest {in_slots}):")
+    as_strings = {**COLUMNS, "name": STRING}
+    strings_path, smallest_path = (
+        folder / "strings.bin",
+        folder / "strings-smallest.bin",
+    )
+    strings = page_file.write(strings_path, orders, columns=as_strings)
+    smallest = page_file.write(
+        smallest_path, orders, encoding=every_column, columns=as_strings
+    )
+    for path, boxes in ((strings_path, strings), (smallest_path, smallest)):
+        stored = sum(page.size for page in boxes["name"])
+        print(f"  {path.name}: {stored} bytes = {tray_bytes(boxes['name'])}")
+        same = read_back(path) == orders
+        print(f"    read back, told nothing: same as the table? {same}")
+
+    shop = [(row[3],) for row in TAGGED_ORDERS]
+    page_file.write(folder / "shop-names.bin", shop, columns={"name": STRING})
+    names = [name for (name,) in read_back(folder / "shop-names.bin")]
+    print(f"the shop's names as strings, read back: {names}")
+
+    k = 4
+    print(f"one name, row {k}, from a box the picker already knows:")
+    padded_path = folder / "padded.bin"
+    page = page_file.write(padded_path, orders)["name"][0]
+    with CountingFile(padded_path) as f:
+        f.seek(page.offset + k * NAME_WIDTH)  # a fixed width makes this arithmetic
+        (name,) = fixed_values(COLUMNS["name"], f.read(NAME_WIDTH))
+        print(f"  {padded_path.name}: {name!r} — tally: {f.tally()}")
+    with CountingFile(strings_path) as f:
+        name = page_file.read_string(f, strings["name"][0], k)
+        print(f"  {strings_path.name}: {name!r} — tally: {f.tally()}")
 
 
 def main() -> int:

@@ -97,10 +97,10 @@ def test_pages_opens_the_file_from_its_footer(tmp_path):
     lines = run_pages(tmp_path)
     assert "write pages.bin: 34522 bytes, each column cut into pages" in lines
     start = lines.index(
-        "open pages.bin: version 2, 1000 rows, columns id, price, qty, name, 40 pages"
+        "open pages.bin: version 3, 1000 rows, columns id, price, qty, name, 40 pages"
     )
     assert lines[start : start + 6] == [
-        "open pages.bin: version 2, 1000 rows, columns id, price, qty, name, 40 pages",
+        "open pages.bin: version 3, 1000 rows, columns id, price, qty, name, 40 pages",
         "  tally: reads 2, bytes read 2522, seeks 2",
         "sum(qty) from pages.bin, told nothing = 8125",
         "  tally: reads 12, bytes read 6522, seeks 12",
@@ -225,4 +225,24 @@ def test_shapes_shows_what_fixed_widths_cannot_say(tmp_path):
         "pack None as a price: refused, required argument is not a float",
         "  stored as 0.0 instead: the cheapest order is gloves at 0.0",
         "  and the average price is 8.19; the 6 known prices average 10.92",
+    ]
+
+
+def test_shapes_stores_names_as_strings(tmp_path):
+    lines = run_shapes(tmp_path)
+    start = lines.index(
+        "the same names as strings (in slots: plain 12000, smallest 2000):"
+    )
+    assert lines[start : start + 9] == [
+        "the same names as strings (in slots: plain 12000, smallest 2000):",
+        "  strings.bin: 10290 bytes = offsets plain 4040 + data plain 6250",
+        "    read back, told nothing: same as the table? True",
+        "  strings-smallest.bin: 6765 bytes = "
+        "offsets bit-packed 1280 + data bit-packed 5485",
+        "    read back, told nothing: same as the table? True",
+        "the shop's names as strings, read back: ['bolts', 'hammer', 'washers', "
+        "'tape', 'drill bits Ø6', 'nails', 'gloves', 'padlock']",
+        "one name, row 4, from a box the picker already knows:",
+        "  padded.bin: 'drill bits' — tally: reads 1, bytes read 12, seeks 1",
+        "  strings.bin: 'drill bits' — tally: reads 2, bytes read 18, seeks 2",
     ]
