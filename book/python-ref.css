@@ -1,0 +1,47 @@
+/* "Python used here" and "Lance concepts used here" chip strips: a small
+   bar of links at the first use of each construct or idea. */
+
+.python-concepts,
+.dl-concepts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35em 0.9em;
+    align-items: baseline;
+    margin: 1em 0;
+    padding: 0.55em 0.9em;
+    font-size: 0.9em;
+    border: 1px solid var(--quote-border, #ccc);
+    border-left: 4px solid var(--links, #4183c4);
+    border-radius: 4px;
+    background: var(--quote-bg, rgba(0, 0, 0, 0.04));
+}
+
+/* Lance / data-systems reference strips: teal edge, to tell ideas from language. */
+.dl-concepts {
+    border-left-color: #178a9e;
+}
+
+.python-concepts > span,
+.dl-concepts > span {
+    font-weight: 600;
+}
+
+.python-concepts a,
+.dl-concepts a {
+    white-space: nowrap;
+}
+
+/* Tip-style callouts (theory warnings, typing budgets, reading tips):
+   smaller and boxed, clearly an aside rather than body text. */
+.callout {
+    font-size: 0.85em;
+    line-height: 1.55;
+    background: rgba(127, 127, 127, 0.09);
+    border-left: 4px solid #178a9e;
+    border-radius: 0 6px 6px 0;
+    padding: 0.7em 1em;
+    margin: 1.2em 0;
+}
+.callout p:first-child { margin-top: 0; }
+.callout p:last-child { margin-bottom: 0; }
+.callout table { font-size: 1em; }

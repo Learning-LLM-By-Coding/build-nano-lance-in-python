@@ -1,0 +1,10 @@
+# uv's virtual environment and Python caches
+/.venv
+__pycache__/
+/.pytest_cache
+/.ruff_cache
+
+# mdBook build output (book/book is generated from book/src)
+/book/book
+
+.DS_Store

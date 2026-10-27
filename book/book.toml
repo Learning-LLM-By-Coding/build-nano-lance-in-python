@@ -1,0 +1,16 @@
+[book]
+title = "Build nano-Lance in Python"
+authors = ["Link"]
+language = "en"
+src = "src"
+
+[build]
+# Fail the build (and the green bar) if SUMMARY.md names a missing chapter,
+# instead of silently creating an empty one.
+create-missing = false
+
+[output.html]
+# "Python used here" / "Lance concepts used here" chip strips.
+# Concept links to the story page open as floating reminders.
+additional-css = ["python-ref.css", "story-tips.css"]
+additional-js = ["story-tips.js"]
