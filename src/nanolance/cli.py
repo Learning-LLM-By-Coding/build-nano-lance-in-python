@@ -1,13 +1,23 @@
 """The `nanolance` command line."""
 
 import argparse
+import struct
 from collections import Counter
 from itertools import groupby
 from pathlib import Path
 
 from nanolance import __version__, column_layout, encodings, page_file, row_layout
 from nanolance.counting import CountingFile
-from nanolance.orders import COLUMNS, ORDERS, ROW_WIDTH, Row, many_orders
+from nanolance.orders import (
+    COLUMNS,
+    NAME_WIDTH,
+    ORDERS,
+    ROW_WIDTH,
+    TAGGED_ORDERS,
+    Row,
+    many_orders,
+    pack_value,
+)
 from nanolance.page_file import ROWS_PER_PAGE, Page
 
 
@@ -279,6 +289,42 @@ def packing(folder: Path) -> None:
             ask_qty(path, start, stop)
 
 
+def shapes(folder: Path) -> None:
+    """Analogy: the shop's real orders reach the packer's bench — a name too
+    long for its compartment, short names rattling in theirs, and prices
+    nobody has quoted yet.
+
+    Print Day 4's table, then what Day 1's fixed widths make of it: the
+    padding they spend, and the values they refuse.
+    """
+    folder.mkdir(parents=True, exist_ok=True)
+    print(f"the orders as the shop sends them: {len(TAGGED_ORDERS)} rows")
+    for row in TAGGED_ORDERS:
+        print(f"  {row}")
+
+    orders = many_orders(1000)
+    slots = len(orders) * NAME_WIDTH
+    letters = sum(len(row[3].encode("utf-8")) for row in orders)
+    print(
+        f"names of Day 3's {len(orders)} orders, in {NAME_WIDTH}-byte slots: "
+        f"{slots} bytes, {letters} of them letters, {slots - letters} padding"
+    )
+    for column, value in (("name", "drill bits Ø6"), ("price", None)):
+        try:
+            pack_value(column, value)
+        except (ValueError, struct.error) as error:
+            print(f"pack {value!r} as a {column}: refused, {error}")
+    zeros = [(0.0 if row[1] is None else row[1], row[3]) for row in TAGGED_ORDERS]
+    known = [row[1] for row in TAGGED_ORDERS if row[1] is not None]
+    price, name = min(zeros)
+    average = sum(p for p, _ in zeros) / len(zeros)
+    print(f"  stored as 0.0 instead: the cheapest order is {name} at {price}")
+    print(
+        f"  and the average price is {average:.2f}; "
+        f"the {len(known)} known prices average {sum(known) / len(known):.2f}"
+    )
+
+
 def main() -> int:
     """Run one demo by name; with no name, print the hello line."""
     parser = argparse.ArgumentParser(prog="nanolance")
@@ -289,6 +335,8 @@ def main() -> int:
     demo.add_argument("folder", type=Path, nargs="?", default=Path("warehouse"))
     demo = demos.add_parser("packing", help="pack each page in fewer bytes")
     demo.add_argument("folder", type=Path, nargs="?", default=Path("warehouse"))
+    demo = demos.add_parser("shapes", help="store values of any length, or none")
+    demo.add_argument("folder", type=Path, nargs="?", default=Path("warehouse"))
     args = parser.parse_args()
 
     if args.demo == "layouts":
@@ -297,6 +345,8 @@ def main() -> int:
         pages(args.folder)
     elif args.demo == "packing":
         packing(args.folder)
+    elif args.demo == "shapes":
+        shapes(args.folder)
     else:
         print(f"nanolance {__version__}: scaffold is alive")
     return 0

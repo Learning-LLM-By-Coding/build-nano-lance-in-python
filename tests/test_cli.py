@@ -201,3 +201,28 @@ def test_packing_keeps_the_smallest_and_reads_fewer_bytes(tmp_path):
         "[40, 2, 1, 12, 4, 2, 3, 1, 40, 2]",
         "  tally: reads 3, bytes read 2744, seeks 3 (opening 2668, pages 76)",
     ]
+
+
+def run_shapes(folder):
+    result = subprocess.run(
+        [sys.executable, "-m", "nanolance", "shapes", str(folder)],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.splitlines()
+
+
+def test_shapes_shows_what_fixed_widths_cannot_say(tmp_path):
+    lines = run_shapes(tmp_path)
+    assert lines[0] == "the orders as the shop sends them: 8 rows"
+    assert lines[5] == "  (105, 23.5, 1, 'drill bits Ø6', ['fragile'])"
+    assert lines[9:14] == [
+        "names of Day 3's 1000 orders, in 12-byte slots: 12000 bytes, "
+        "6250 of them letters, 5750 padding",
+        "pack 'drill bits Ø6' as a name: refused, name needs 14 bytes; "
+        "the slot holds 12",
+        "pack None as a price: refused, required argument is not a float",
+        "  stored as 0.0 instead: the cheapest order is gloves at 0.0",
+        "  and the average price is 8.19; the 6 known prices average 10.92",
+    ]

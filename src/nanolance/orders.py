@@ -32,6 +32,27 @@ ORDERS: list[Row] = [
 ]
 
 
+# Analogy: the same eight orders as the shop really sends them — a name too
+# long for its compartment, tags on most of them, and two prices nobody has
+# quoted yet.
+#
+# Day 4's table: the same ids and quantities as ORDERS, but a price may be
+# None (not known yet), a name may need more than NAME_WIDTH bytes, and tags
+# is a list of words, possibly empty.
+TaggedRow = tuple[int, float | None, int, str, list[str]]
+
+TAGGED_ORDERS: list[TaggedRow] = [
+    (101, 4.25, 3, "bolts", ["bulk"]),
+    (102, 12.5, 1, "hammer", []),
+    (103, None, 40, "washers", ["bulk", "small parts"]),
+    (104, 7.0, 2, "tape", []),
+    (105, 23.5, 1, "drill bits Ø6", ["fragile"]),
+    (106, 3.25, 12, "nails", ["bulk"]),
+    (107, None, 4, "gloves", []),
+    (108, 15.0, 2, "padlock", ["gift", "fragile"]),
+]
+
+
 def pack_value(column: str, value: int | float | str) -> bytes:
     """Analogy: put one value into its compartment.
 
