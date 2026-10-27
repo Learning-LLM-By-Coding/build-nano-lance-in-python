@@ -289,3 +289,68 @@ def test_a_take_by_scanning_reads_every_page_of_every_column_asked(tmp_path):
         assert rows == [("gloves", None), ("washers", None), ("gloves", None)]
         every_page = pages["name"] + pages["price"]
         assert (f.reads, f.bytes_read) == (20, sum(p.size for p in every_page))
+
+
+def test_start_numbers_find_the_page_and_the_place_of_a_row():
+    pages = [Page(0, 10, 100), Page(10, 10, 100), Page(20, 5, 50)]
+    starts = page_file.page_starts(pages)
+    assert starts == [0, 100, 200]
+    assert page_file.locate(starts, 0) == (0, 0)  # the very first row
+    assert page_file.locate(starts, 99) == (0, 99)  # last of a page
+    assert page_file.locate(starts, 100) == (1, 0)  # first of the next
+    assert page_file.locate(starts, 249) == (2, 49)  # the very last row
+
+
+TAKES = {
+    "first and last": [0, 999],
+    "out of order": [512, 3, 998, 40],
+    "repeats": [7, 7, 2, 7],
+    "page edges": [99, 100, 199, 200],
+    "missing prices": [2, 6, 10, 14],
+    "nothing": [],
+}
+
+
+@pytest.mark.parametrize("encoding", ["plain", "smallest"])
+@pytest.mark.parametrize("row_ids", TAKES.values(), ids=TAKES.keys())
+def test_take_returns_exactly_the_rows_asked_in_the_order_asked(
+    tmp_path, row_ids, encoding
+):
+    path = tmp_path / "shop.bin"
+    tagged = many_tagged_orders(1000)
+    every_column = {column: encoding for column in TAGGED_COLUMNS}
+    page_file.write(path, tagged, 70, every_column, TAGGED_COLUMNS)  # 70: uneven pages
+    with CountingFile(path) as f:
+        metadata = page_file.read_metadata(f)
+        columns = ["tags", "id", "price", "name"]  # any columns, in any order
+        rows = page_file.take(f, metadata, row_ids, columns)
+        assert rows == page_file.take_by_scan(f, metadata, row_ids, columns)
+    assert rows == [
+        (tagged[r][4], tagged[r][0], tagged[r][1], tagged[r][3]) for r in row_ids
+    ]
+
+
+def test_take_reads_only_the_pages_that_hold_a_row_each_once(tmp_path):
+    path = tmp_path / "pages.bin"
+    page_file.write(path, many_orders(1000))
+    with CountingFile(path) as f:
+        metadata = page_file.read_metadata(f)
+    with CountingFile(path) as f:
+        rows = page_file.take(f, metadata, [999, 0, 5, 100, 99, 5], ["qty"])
+        assert rows == [(2,), (3,), (12,), (1,), (2,), (12,)]
+        assert (f.reads, f.bytes_read, f.seeks) == (3, 3 * 400, 3)  # pages 9, 0, 1
+    with CountingFile(path) as f:
+        assert page_file.take(f, metadata, [], ["qty", "name"]) == []
+        assert (f.reads, f.bytes_read, f.seeks) == (0, 0, 0)
+
+
+@pytest.mark.parametrize("row_id", [-1, 1000])
+def test_a_row_id_the_file_does_not_hold_is_refused_before_any_read(tmp_path, row_id):
+    path = tmp_path / "pages.bin"
+    page_file.write(path, many_orders(1000))
+    with CountingFile(path) as f:
+        metadata = page_file.read_metadata(f)
+    with CountingFile(path) as f:
+        with pytest.raises(IndexError, match=f"row id {row_id}: the file holds rows"):
+            page_file.take(f, metadata, [5, row_id], ["qty"])
+        assert f.reads == 0

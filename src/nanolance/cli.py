@@ -499,6 +499,18 @@ def take(folder: Path) -> None:
             print(f"  row {row_id}: {row}")
         print(f"  tally: {f.tally()}")
 
+    starts = page_file.page_starts(metadata.pages["qty"])
+    print(f"start numbers of the qty boxes: {starts[:3]} … {starts[-1]}")
+    for row_id in PICK_LIST[:2]:
+        n, k = page_file.locate(starts, row_id)
+        print(f"  row {row_id}: box {n}, place {k}")
+    boxes = sorted({page_file.locate(starts, row_id)[0] for row_id in PICK_LIST})
+    print(f"  the whole list: {len(boxes)} boxes per column, {boxes}")
+    with CountingFile(shop_path) as f:
+        rows = page_file.take(f, metadata, PICK_LIST, columns)
+        print(f"take box by box: the same rows? {rows == scanned}")
+        print(f"  tally: {f.tally()}")
+
 
 def main() -> int:
     """Run one demo by name; with no name, print the hello line."""

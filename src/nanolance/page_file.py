@@ -9,6 +9,7 @@ JSON), and last a fixed-size footer that says where the metadata is.
 
 import json
 import struct
+from bisect import bisect_right
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import BinaryIO
@@ -272,6 +273,57 @@ def take_by_scan(
     check_row_ids(metadata, row_ids)
     values = {c: read_column(f, metadata.codecs[c], metadata.pages[c]) for c in columns}
     return [tuple(values[c][row_id] for c in columns) for row_id in row_ids]
+
+
+def page_starts(pages: list[Page]) -> list[int]:
+    """Analogy: start numbers — the number of the first order in every box,
+    added up from the box list's row counts.
+
+    The row number of every page's first value: 0, then a running total of
+    the pages' row counts.
+    """
+    starts, first = [], 0
+    for page in pages:
+        starts.append(first)
+        first += page.rows
+    return starts
+
+
+def locate(starts: list[int], row_id: int) -> tuple[int, int]:
+    """Analogy: find an order's box by the start numbers, and its place in it.
+
+    The number of the page holding `row_id` — the last page that starts at or
+    before it, found by binary search — and the row's position in that page.
+    """
+    n = bisect_right(starts, row_id) - 1
+    return n, row_id - starts[n]
+
+
+def take(
+    f: BinaryIO, metadata: Metadata, row_ids: list[int], columns: list[str]
+) -> list[tuple]:
+    """Analogy: a pick list, box by box — find each order's box by the start
+    numbers and carry back only that box, each box once.
+
+    The rows at `row_ids` (positions, from 0), in that order, repeats allowed,
+    each with the `columns` asked for, in that order. Only the pages holding a
+    requested row are read, each with one seek and one read however many of
+    its rows are asked for, and each is decoded on its own.
+    """
+    check_row_ids(metadata, row_ids)
+    picked = []
+    for column in columns:
+        kind, pages = metadata.codecs[column], metadata.pages[column]
+        starts = page_starts(pages)
+        opened = {}  # page number -> its values, so no page is read twice
+        values = []
+        for row_id in row_ids:
+            n, k = locate(starts, row_id)
+            if n not in opened:
+                opened[n] = read_page(f, kind, pages[n])
+            values.append(opened[n][k])
+        picked.append(values)
+    return list(zip(*picked, strict=True))
 
 
 def read_metadata(f: CountingFile) -> Metadata:

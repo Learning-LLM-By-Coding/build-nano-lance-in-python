@@ -319,3 +319,16 @@ def test_take_by_scanning_reads_every_page_for_ten_rows(tmp_path):
         "  row 5050: (5151, None, 40, 'washers', ['bulk', 'small parts'])",
         "  tally: reads 500, bytes read 185577, seeks 500",
     ]
+
+
+def test_take_box_by_box_reads_only_the_boxes_on_the_list(tmp_path):
+    lines = run_take(tmp_path)
+    start = lines.index("start numbers of the qty boxes: [0, 100, 200] … 9900")
+    assert lines[start : start + 6] == [
+        "start numbers of the qty boxes: [0, 100, 200] … 9900",
+        "  row 7342: box 73, place 42",
+        "  row 15: box 0, place 15",
+        "  the whole list: 9 boxes per column, [0, 4, 27, 31, 50, 60, 73, 81, 99]",
+        "take box by box: the same rows? True",
+        "  tally: reads 45, bytes read 16672, seeks 45",
+    ]
