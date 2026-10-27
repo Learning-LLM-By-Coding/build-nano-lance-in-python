@@ -1,4 +1,5 @@
 from nanolance import row_layout
+from nanolance.counting import CountingFile
 from nanolance.orders import COLUMNS, ORDERS, ROW_WIDTH, pack_value
 
 
@@ -19,3 +20,11 @@ def test_rows_round_trip_exactly(tmp_path):
     row_layout.write(path, ORDERS)
     with open(path, "rb") as f:
         assert row_layout.read_all(f, len(ORDERS)) == ORDERS
+
+
+def test_summing_one_column_reads_every_byte(tmp_path):
+    path = tmp_path / "rows.bin"
+    row_layout.write(path, ORDERS)
+    with CountingFile(path) as f:
+        assert row_layout.sum_column(f, "qty", len(ORDERS)) == 65
+        assert (f.reads, f.bytes_read, f.seeks) == (8, 256, 0)

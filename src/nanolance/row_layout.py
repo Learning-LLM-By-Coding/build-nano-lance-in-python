@@ -33,3 +33,13 @@ def read_all(f: BinaryIO, n_rows: int) -> list[Row]:
     """Read every row, front to back. The file does not record how many
     rows it holds, so the caller has to say."""
     return [read_row(f) for _ in range(n_rows)]
+
+
+def sum_column(f: BinaryIO, column: str, n_rows: int) -> int | float:
+    """Analogy: the stock count, done crate by crate.
+
+    Add up one column's values. In this layout the values sit inside every
+    row, so every row is read whole.
+    """
+    position = list(COLUMNS).index(column)
+    return sum(row[position] for row in read_all(f, n_rows))

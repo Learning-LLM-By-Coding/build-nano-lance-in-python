@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 
 from nanolance import __version__, row_layout
+from nanolance.counting import CountingFile
 from nanolance.orders import COLUMNS, ORDERS, ROW_WIDTH
 
 
@@ -23,9 +24,16 @@ def layouts(folder: Path) -> None:
     row_layout.write(rows_path, ORDERS)
     size = rows_path.stat().st_size
     print(f"write {rows_path.name}: {size} bytes = {n_rows} rows × {ROW_WIDTH} bytes")
-    with open(rows_path, "rb") as f:
+    with CountingFile(rows_path) as f:
         same = row_layout.read_all(f, n_rows) == ORDERS
-    print(f"read {rows_path.name} back: same as the table? {same}")
+        print(f"read {rows_path.name} back: same as the table? {same}")
+        print(f"  tally: {f.tally()}")
+
+    needed = n_rows * COLUMNS["qty"].size
+    with CountingFile(rows_path) as f:
+        total = row_layout.sum_column(f, "qty", n_rows)
+        print(f"sum(qty) from {rows_path.name} = {total}")
+        print(f"  tally: {f.tally()} (qty needs only {needed} of them)")
 
 
 def main() -> int:
