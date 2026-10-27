@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from nanolance import column_layout, page_file
@@ -114,8 +116,10 @@ def test_another_version_is_refused(tmp_path):
     page_file.write(path, ORDERS)
     data = path.read_bytes()
     offset, size, _, _ = FOOTER.unpack(data[-FOOTER.size :])
-    path.write_bytes(data[: -FOOTER.size] + FOOTER.pack(offset, size, 2, MAGIC))
-    with pytest.raises(ValueError, match="version 2; this reader reads version 1"):
+    path.write_bytes(data[: -FOOTER.size] + FOOTER.pack(offset, size, 3, MAGIC))
+    with pytest.raises(
+        ValueError, match="version 3; this reader reads versions 1 to 2"
+    ):
         open_metadata(path)
 
 
@@ -127,3 +131,44 @@ def test_a_footer_pointing_outside_the_file_is_refused(tmp_path):
     path.write_bytes(data[: -FOOTER.size] + FOOTER.pack(offset, 10**6, VERSION, MAGIC))
     with pytest.raises(ValueError, match="damaged nanolance file"):
         open_metadata(path)
+
+
+def test_each_page_records_its_encoding(tmp_path):
+    path = tmp_path / "pages.bin"
+    pages = page_file.write(
+        path, ORDERS, rows_per_page=3, encoding={"qty": "dictionary"}
+    )
+    assert pages["id"][0] == Page(offset=0, size=24, rows=3)  # plain by default
+    assert pages["qty"][0] == Page(offset=128, size=19, rows=3, encoding="dictionary")
+    with CountingFile(path) as f:
+        assert page_file.read_metadata(f).pages == pages
+
+
+def test_a_reader_decodes_every_page_by_its_encoding(tmp_path):
+    path = tmp_path / "pages.bin"
+    orders = many_orders(1000)
+    page_file.write(path, orders, encoding={c: "dictionary" for c in COLUMNS})
+    with CountingFile(path) as f:
+        metadata = page_file.read_metadata(f)
+        for position, (column, codec) in enumerate(metadata.codecs.items()):
+            values = page_file.read_column(f, codec, metadata.pages[column])
+            assert values == [row[position] for row in orders]
+
+
+def test_a_version_1_file_still_reads_as_all_plain(tmp_path):
+    path = tmp_path / "pages.bin"
+    orders = many_orders(1000)
+    page_file.write(path, orders)
+    data = path.read_bytes()
+    offset, size, _, _ = FOOTER.unpack(data[-FOOTER.size :])
+    metadata = json.loads(data[offset : offset + size])
+    for column in metadata["columns"]:
+        for page in column["pages"]:
+            del page["encoding"]  # version 1 box lists had no packing notes
+    raw = json.dumps(metadata).encode("utf-8")
+    path.write_bytes(data[:offset] + raw + FOOTER.pack(offset, len(raw), 1, MAGIC))
+    with CountingFile(path) as f:
+        metadata = page_file.read_metadata(f)
+        assert metadata.version == 1
+        qty = page_file.read_column(f, metadata.codecs["qty"], metadata.pages["qty"])
+    assert qty == [row[2] for row in orders]

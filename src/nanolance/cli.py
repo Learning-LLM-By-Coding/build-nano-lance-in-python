@@ -4,9 +4,9 @@ import argparse
 from itertools import groupby
 from pathlib import Path
 
-from nanolance import __version__, column_layout, page_file, row_layout
+from nanolance import __version__, column_layout, encodings, page_file, row_layout
 from nanolance.counting import CountingFile
-from nanolance.orders import COLUMNS, ORDERS, ROW_WIDTH, many_orders
+from nanolance.orders import COLUMNS, ORDERS, ROW_WIDTH, Row, many_orders
 from nanolance.page_file import ROWS_PER_PAGE
 
 
@@ -161,6 +161,48 @@ def describe(values: list[int | float | str]) -> str:
     return facts
 
 
+def every_way(title: str, table: list[Row]) -> None:
+    """Analogy: the packer packs every aisle's boxes every way it knows, and
+    weighs each result.
+
+    For each column, the bytes of all its pages in every encoding of
+    ENCODINGS — or "—" where an encoding refuses the column's values.
+    """
+    print(f"every column packed every way, orders {title} (bytes, all pages):")
+    for column, codec in COLUMNS.items():
+        pages = page_file.plain_pages(table, column)
+        sizes = []
+        for name in encodings.ENCODINGS:
+            try:
+                size = sum(len(encodings.encode(name, codec, page)) for page in pages)
+                sizes.append(f"{name} {size}")
+            except ValueError:
+                sizes.append(f"{name} —")
+        print(f"  {column}: {', '.join(sizes)}")
+
+
+def write_and_read_back(path: Path, table: list[Row], encoding: dict[str, str]) -> None:
+    """Analogy: pack a whole warehouse, then send a picker who knows nothing
+    to unpack every box by its packing note.
+
+    Write `table` with the chosen encodings, print the file's size and its
+    pages' share, then read every column back using only the file.
+    """
+    pages = page_file.write(path, table, encoding=encoding)
+    size = path.stat().st_size
+    stored = sum(page.size for boxes in pages.values() for page in boxes)
+    plain = len(table) * ROW_WIDTH
+    print(f"write {path.name}: {size} bytes, pages {stored} (plain: {plain})")
+    with CountingFile(path) as f:
+        metadata = page_file.read_metadata(f)
+        columns = [
+            page_file.read_column(f, metadata.codecs[c], metadata.pages[c])
+            for c in COLUMNS
+        ]
+        same = list(zip(*columns, strict=True)) == table
+        print(f"  read back, told nothing: same as the table? {same}")
+
+
 def packing(folder: Path) -> None:
     """Analogy: the packer looks inside the boxes — the same few values said
     again and again, each in a full-size compartment.
@@ -182,6 +224,10 @@ def packing(folder: Path) -> None:
             values = [row[position] for row in table[:ROWS_PER_PAGE]]
             plain = len(values) * codec.size
             print(f"  {column}: {plain} bytes plain — {describe(values)}")
+
+    every_way("as placed", orders)
+    in_dictionaries = {"price": "dictionary", "qty": "dictionary", "name": "dictionary"}
+    write_and_read_back(folder / "dictionary.bin", orders, in_dictionaries)
 
 
 def main() -> int:

@@ -13,6 +13,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import BinaryIO
 
+from nanolance import encodings
 from nanolance.counting import CountingFile
 from nanolance.orders import COLUMNS, Row, pack_value
 
@@ -25,21 +26,23 @@ ROWS_PER_PAGE = 100
 # version (4 bytes), and the magic bytes that name the format (4 bytes).
 FOOTER = struct.Struct("<QQI4s")
 MAGIC = b"NLNC"
-VERSION = 1
+VERSION = 2  # 2: every page records its encoding
 
 
 @dataclass(frozen=True)
 class Page:
     """Analogy: one line of a box list — where a box sits, how many bytes it
-    weighs, and how many values it holds.
+    weighs, how many values it holds, and the packing note: how it was packed.
 
     `offset` is the page's first byte in the file, `size` its length in
-    bytes, `rows` the number of values in it.
+    bytes, `rows` the number of values in it, `encoding` the name of the
+    encoding its bytes are stored in (version 1 files had only plain pages).
     """
 
     offset: int
     size: int
     rows: int
+    encoding: str = "plain"
 
 
 @dataclass(frozen=True)
@@ -57,19 +60,45 @@ class Metadata:
     pages: dict[str, list[Page]]
 
 
+def plain_pages(
+    rows: list[Row], column: str, rows_per_page: int = ROWS_PER_PAGE
+) -> list[bytes]:
+    """Analogy: fill one aisle's boxes with full-size compartments.
+
+    One column's values cut into pages of up to `rows_per_page` values, each
+    page packed plain: its values back to back at the column's fixed width.
+    """
+    position = list(COLUMNS).index(column)
+    return [
+        b"".join(
+            pack_value(column, row[position])
+            for row in rows[first : first + rows_per_page]
+        )
+        for first in range(0, len(rows), rows_per_page)
+    ]
+
+
 def write(
-    path: Path, rows: list[Row], rows_per_page: int = ROWS_PER_PAGE
+    path: Path,
+    rows: list[Row],
+    rows_per_page: int = ROWS_PER_PAGE,
+    encoding: dict[str, str] | None = None,
 ) -> dict[str, list[Page]]:
     """Write `rows` column by column, each column cut into pages of up to
-    `rows_per_page` values. Returns every column's list of pages."""
+    `rows_per_page` values. `encoding` names an encoding per column (a
+    column it leaves out is stored plain). Returns every column's pages."""
+    chosen = encoding or {}
     pages: dict[str, list[Page]] = {}
     with open(path, "wb") as out:
-        for position, column in enumerate(COLUMNS):
+        for column, codec in COLUMNS.items():
             pages[column] = []
-            for first in range(0, len(rows), rows_per_page):
-                chunk = rows[first : first + rows_per_page]
-                data = b"".join(pack_value(column, row[position]) for row in chunk)
-                page = Page(offset=out.tell(), size=len(data), rows=len(chunk))
+            name = chosen.get(column, "plain")
+            for plain in plain_pages(rows, column, rows_per_page):
+                data = encodings.encode(name, codec, plain)
+                n_rows = len(plain) // codec.size
+                page = Page(
+                    offset=out.tell(), size=len(data), rows=n_rows, encoding=name
+                )
                 pages[column].append(page)
                 out.write(data)
 
@@ -92,14 +121,17 @@ def write(
 
 
 def read_page(f: BinaryIO, codec: struct.Struct, page: Page) -> list[int | float | str]:
-    """Analogy: walk to one box and carry it back whole.
+    """Analogy: walk to one box, carry it back whole, and unpack it the way
+    its packing note says.
 
-    One seek, one read of `page.size` bytes, cut into values by `codec`.
+    One seek, one read of `page.size` bytes, decoded by the page's encoding
+    back to plain bytes, then cut into values by `codec`.
     """
     f.seek(page.offset)
     raw = f.read(page.size)
+    plain = encodings.decode(page.encoding, codec, raw, page.rows)
     values = []
-    for (value,) in codec.iter_unpack(raw):
+    for (value,) in codec.iter_unpack(plain):
         if isinstance(value, bytes):
             value = value.rstrip(b"\0").decode("utf-8")
         values.append(value)
@@ -138,8 +170,9 @@ def read_metadata(f: CountingFile) -> Metadata:
 
     Two seeks and two reads: the footer (the file's last FOOTER.size
     bytes), then the column metadata at the offset the footer gives. A file
-    without the magic bytes, of another version, or whose footer points
-    outside the file is refused with a ValueError before the second read.
+    without the magic bytes, of a version this reader does not know, or whose
+    footer points outside the file is refused with a ValueError before the
+    second read. Version 1 files read as files whose pages are all plain.
     """
     if f.size < FOOTER.size:
         raise ValueError(
@@ -151,9 +184,10 @@ def read_metadata(f: CountingFile) -> Metadata:
     metadata_offset, metadata_size, version, magic = FOOTER.unpack(footer)
     if magic != MAGIC:
         raise ValueError(f"not a nanolance file: it ends with {magic!r}, not {MAGIC!r}")
-    if version != VERSION:
+    if not 1 <= version <= VERSION:
         raise ValueError(
-            f"nanolance file version {version}; this reader reads version {VERSION}"
+            f"nanolance file version {version}; "
+            f"this reader reads versions 1 to {VERSION}"
         )
     footer_start = f.size - FOOTER.size
     if metadata_offset + metadata_size > footer_start:

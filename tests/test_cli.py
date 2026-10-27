@@ -95,18 +95,18 @@ def test_pages_reads_only_the_pages_it_needs(tmp_path):
 
 def test_pages_opens_the_file_from_its_footer(tmp_path):
     lines = run_pages(tmp_path)
-    assert "write pages.bin: 33762 bytes, each column cut into pages" in lines
+    assert "write pages.bin: 34522 bytes, each column cut into pages" in lines
     start = lines.index(
-        "open pages.bin: version 1, 1000 rows, columns id, price, qty, name, 40 pages"
+        "open pages.bin: version 2, 1000 rows, columns id, price, qty, name, 40 pages"
     )
     assert lines[start : start + 6] == [
-        "open pages.bin: version 1, 1000 rows, columns id, price, qty, name, 40 pages",
-        "  tally: reads 2, bytes read 1762, seeks 2",
+        "open pages.bin: version 2, 1000 rows, columns id, price, qty, name, 40 pages",
+        "  tally: reads 2, bytes read 2522, seeks 2",
         "sum(qty) from pages.bin, told nothing = 8125",
-        "  tally: reads 12, bytes read 5762, seeks 12",
+        "  tally: reads 12, bytes read 6522, seeks 12",
         "qty of rows 10–19 from pages.bin, told nothing = "
         "[40, 2, 1, 12, 4, 2, 3, 1, 40, 2]",
-        "  tally: reads 3, bytes read 2162, seeks 3",
+        "  tally: reads 3, bytes read 2922, seeks 3",
     ]
 
 
@@ -145,4 +145,20 @@ def test_packing_shows_what_each_first_page_holds(tmp_path):
         "  price: 800 bytes plain — 1 distinct, longest run 100",
         "  qty: 400 bytes plain — 1 distinct, longest run 100, largest 3 needs 2 bits",
         "  name: 1200 bytes plain — 1 distinct, longest run 100",
+    ]
+
+
+def test_packing_packs_every_column_every_way(tmp_path):
+    lines = run_packing(tmp_path)
+    start = lines.index(
+        "every column packed every way, orders as placed (bytes, all pages):"
+    )
+    assert lines[start : start + 7] == [
+        "every column packed every way, orders as placed (bytes, all pages):",
+        "  id: plain 8000, dictionary 9040",
+        "  price: plain 8000, dictionary 1680",
+        "  qty: plain 4000, dictionary 1280",
+        "  name: plain 12000, dictionary 2000",
+        "write dictionary.bin: 15612 bytes, pages 12960 (plain: 32000)",
+        "  read back, told nothing: same as the table? True",
     ]
