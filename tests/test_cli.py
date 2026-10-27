@@ -76,3 +76,18 @@ def test_pages_shows_what_the_column_file_must_be_told(tmp_path):
         "qty of rows 10–19 from columns.bin = [40, 2, 1, 12, 4, 2, 3, 1, 40, 2]",
         "  tally: reads 1, bytes read 4000, seeks 1 (rows 10–19 need only 40 of them)",
     ]
+
+
+def test_pages_reads_only_the_pages_it_needs(tmp_path):
+    lines = run_pages(tmp_path)
+    start = lines.index("  id: 10 pages of 800 bytes, at 0, 800, …, 7200")
+    assert lines[start : start + 8] == [
+        "  id: 10 pages of 800 bytes, at 0, 800, …, 7200",
+        "  price: 10 pages of 800 bytes, at 8000, 8800, …, 15200",
+        "  qty: 10 pages of 400 bytes, at 16000, 16400, …, 19600",
+        "  name: 10 pages of 1200 bytes, at 20000, 21200, …, 30800",
+        "sum(qty) from pages.bin = 8125",
+        "  tally: reads 10, bytes read 4000, seeks 10",
+        "qty of rows 10–19 from pages.bin = [40, 2, 1, 12, 4, 2, 3, 1, 40, 2]",
+        "  tally: reads 1, bytes read 400, seeks 1",
+    ]

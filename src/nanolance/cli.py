@@ -3,7 +3,7 @@
 import argparse
 from pathlib import Path
 
-from nanolance import __version__, column_layout, row_layout
+from nanolance import __version__, column_layout, page_file, row_layout
 from nanolance.counting import CountingFile
 from nanolance.orders import COLUMNS, ORDERS, ROW_WIDTH, many_orders
 
@@ -95,6 +95,24 @@ def pages(folder: Path) -> None:
         values = column_layout.read_column(f, "qty", n_rows)[10:20]
         print(f"qty of rows 10–19 from {columns_path.name} = {values}")
         print(f"  tally: {f.tally()} (rows 10–19 need only {needed} of them)")
+
+    pages_path = folder / "pages.bin"
+    box_lists = page_file.write(pages_path, orders)
+    size = pages_path.stat().st_size
+    print(f"write {pages_path.name}: {size} bytes, each column cut into pages")
+    for column, boxes in box_lists.items():
+        at = f"{boxes[0].offset}, {boxes[1].offset}, …, {boxes[-1].offset}"
+        print(f"  {column}: {len(boxes)} pages of {boxes[0].size} bytes, at {at}")
+
+    codec = COLUMNS["qty"]
+    with CountingFile(pages_path) as f:
+        total = sum(page_file.read_column(f, codec, box_lists["qty"]))
+        print(f"sum(qty) from {pages_path.name} = {total}")
+        print(f"  tally: {f.tally()}")
+    with CountingFile(pages_path) as f:
+        values = page_file.read_rows(f, codec, box_lists["qty"], 10, 20)
+        print(f"qty of rows 10–19 from {pages_path.name} = {values}")
+        print(f"  tally: {f.tally()}")
 
 
 def main() -> int:
