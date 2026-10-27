@@ -172,3 +172,14 @@ def test_a_version_1_file_still_reads_as_all_plain(tmp_path):
         assert metadata.version == 1
         qty = page_file.read_column(f, metadata.codecs["qty"], metadata.pages["qty"])
     assert qty == [row[2] for row in orders]
+
+
+def test_smallest_can_pack_each_page_of_a_column_differently(tmp_path):
+    path = tmp_path / "pages.bin"
+    rows = many_orders(100) + [(1001 + k, 1.0, 5, "tape") for k in range(100)]
+    pages = page_file.write(path, rows, encoding={"qty": "smallest"})
+    assert [page.encoding for page in pages["qty"]] == ["bit-packed", "run-length"]
+    with CountingFile(path) as f:
+        metadata = page_file.read_metadata(f)
+        qty = page_file.read_column(f, metadata.codecs["qty"], metadata.pages["qty"])
+    assert qty == [row[2] for row in rows]

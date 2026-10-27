@@ -31,6 +31,7 @@ introduced it, if you want the full explanation again.
 |-----|-------|------------------|
 | 1 | [Crates or aisles](#day-1--crates-or-aisles) | the packing rule, crates, the tally, the stock count, aisles, a customer pickup |
 | 2 | [The wall card at the back](#day-2--the-wall-card-at-the-back) | sealed boxes, the box list, the wall card at the back, the stamp |
+| 3 | [The packer's bench](#day-3--the-packers-bench) | the packer and packing methods, the lid legend, stacks, snug compartments, the packing note, the weigh-in |
 
 ## Day 1 — crates or aisles
 
@@ -159,5 +160,85 @@ turns around after reading one card.
 *What it is:* the footer's last four bytes, `NLNC`, name the format, and its version field says which edition wrote it. The reader checks both before trusting the footer, and refuses a file that is too short, not ours, of another version, or whose footer points outside it. A file whose writing was interrupted has no footer, so it is refused too. The stamp proves whose file it is — not that its box lists are true.
 
 *In the story:* the warehouse's name and edition, printed on the wall card; a picker at the wrong building turns around after reading one card.
+
+</div>
+
+## Day 3 — the packer's bench
+
+The picker carries boxes out; the packer is the one who fills them in
+the first place — and today the packer looks inside and sees waste. Every value sits in a full-size compartment — the
+[packing rule](#packing-rule) — so a quantity of 3 takes four bytes, and
+a box of a hundred names holds the same eight names over and over, each
+with its padding. So the packer learns three new **packing methods**.
+**The lid legend**: write each distinct value once on the lid, and put a
+one-byte legend number in the box for every value. **Stacks**: equal
+values side by side become one value with a sticker saying how many.
+**Snug compartments**: cut every compartment down to the size the box's
+largest value needs. Each method can make a box *bigger* as easily as
+smaller — stacks of one, a legend as long as the box — so every box goes
+through **the weigh-in**: the packer packs it every way, weighs each
+packing, and keeps the lightest. Each line of
+the [box list](#box-list) gains **a packing note** saying how that box
+was packed, so the picker unpacks it the same way; the warehouse's
+[stamp](#stamp) moves to edition 2, so a picker trained on edition 1
+turns around instead of misreading a box.
+
+<div class="concept" id="encodings">
+
+**The packer and packing methods — page encodings** · [Day 3, section B](day-03-encodings.md#section-b--the-lid-legend-a-dictionary-and-a-page-that-names-its-encoding)
+
+*What it is:* an encoding turns one page's *plain* bytes — every value at its column's fixed width, as Day 2 stored them — into other bytes, and a matching decoder turns them back into exactly the same plain bytes. Today's four: plain, dictionary, run-length, and bit-packed (`ENCODINGS` in `encodings.py`). Fewer bytes on disk means fewer bytes read.
+
+*In the story:* the packer at the bench, who fills each box. The plain method is Day 1's packing rule — full-size compartments; the others pack the same values tighter, and a picker can always unpack them back.
+
+</div>
+
+<div class="concept" id="lid-legend">
+
+**The lid legend — dictionary encoding** · [Day 3, section B](day-03-encodings.md#section-b--the-lid-legend-a-dictionary-and-a-page-that-names-its-encoding)
+
+*What it is:* a page stores each distinct value once (the dictionary), then one small code per value — here one byte, so up to 256 distinct values. It wins when a page repeats a few values many times; on a page where every value is different it is larger than plain.
+
+*In the story:* the box's distinct values written once on its lid; inside, each compartment holds only a one-byte legend number pointing at a line of the lid.
+
+</div>
+
+<div class="concept" id="stacks">
+
+**Stacks — run-length encoding** · [Day 3, section C](day-03-encodings.md#section-c--stacks-run-length-and-where-it-backfires)
+
+*What it is:* each *run* — equal values side by side — is stored as one value plus its length. It wins on sorted or slowly changing columns; on a page with no repeats next to each other it doubles the size, because every value gains a length.
+
+*In the story:* equal values side by side stacked together, one value with a sticker saying how many; a stack of one still needs its sticker.
+
+</div>
+
+<div class="concept" id="snug-compartments">
+
+**Snug compartments — bit-packing** · [Day 3, section D](day-03-encodings.md#section-d--snug-compartments-and-the-weigh-in)
+
+*What it is:* whole numbers from 0 up stored in only as many bits as the page's largest value needs (its *bit width*), written once at the start of the page. Forty fits in 6 bits instead of 32. It does not apply to prices, names, or negative numbers.
+
+*In the story:* every compartment in a box cut down to the size its largest value needs.
+
+</div>
+
+<div class="concept" id="packing-note">
+
+**The packing note — each page's encoding, recorded** · [Day 3, section B](day-03-encodings.md#section-b--the-lid-legend-a-dictionary-and-a-page-that-names-its-encoding)
+
+*What it is:* every page's entry in the column metadata now names its encoding (`Page.encoding`), so a reader decodes each page the way it was written. Adding it changed the format, so the version became 2: the new reader still reads version 1 files (all plain), and an old reader refuses version 2 files instead of misreading them.
+
+*In the story:* a note on each line of the box list saying how that box was packed; the stamp moves to edition 2, so a picker trained on edition 1 turns around.
+
+</div>
+
+<div class="concept" id="weigh-in">
+
+**The weigh-in — keep the smallest** · [Day 3, section D](day-03-encodings.md#section-d--snug-compartments-and-the-weigh-in)
+
+*What it is:* for every page, encode with every encoding that accepts its values and store the smallest (`smallest`; a tie keeps plain). Each page of a column may choose differently. The cost is paid when writing: every page is encoded several times to keep one result. Real Lance chooses from cheap statistics instead, such as the number of runs.
+
+*In the story:* the packer packs each box every way at the bench, weighs each packing, keeps the lightest, and throws the rest away.
 
 </div>

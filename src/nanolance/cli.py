@@ -1,13 +1,14 @@
 """The `nanolance` command line."""
 
 import argparse
+from collections import Counter
 from itertools import groupby
 from pathlib import Path
 
 from nanolance import __version__, column_layout, encodings, page_file, row_layout
 from nanolance.counting import CountingFile
 from nanolance.orders import COLUMNS, ORDERS, ROW_WIDTH, Row, many_orders
-from nanolance.page_file import ROWS_PER_PAGE
+from nanolance.page_file import ROWS_PER_PAGE, Page
 
 
 def layouts(folder: Path) -> None:
@@ -181,7 +182,9 @@ def every_way(title: str, table: list[Row]) -> None:
         print(f"  {column}: {', '.join(sizes)}")
 
 
-def write_and_read_back(path: Path, table: list[Row], encoding: dict[str, str]) -> None:
+def write_and_read_back(
+    path: Path, table: list[Row], encoding: dict[str, str]
+) -> dict[str, list[Page]]:
     """Analogy: pack a whole warehouse, then send a picker who knows nothing
     to unpack every box by its packing note.
 
@@ -201,6 +204,34 @@ def write_and_read_back(path: Path, table: list[Row], encoding: dict[str, str]) 
         ]
         same = list(zip(*columns, strict=True)) == table
         print(f"  read back, told nothing: same as the table? {same}")
+    return pages
+
+
+def packing_notes(boxes: list[Page]) -> str:
+    """How many of one column's pages each encoding packed, e.g. "dictionary ×10"."""
+    counts = Counter(page.encoding for page in boxes)
+    return " + ".join(f"{name} ×{n}" for name, n in counts.items())
+
+
+def ask_qty(path: Path, start: int, stop: int) -> None:
+    """Analogy: Day 2's two questions, asked by a picker who knows nothing —
+    the stock count, or the quantities of a few orders.
+
+    Read qty for rows `start` to `stop` from a fresh open, and split the
+    tally's bytes into the opening (footer and metadata) and the pages.
+    """
+    with CountingFile(path) as f:
+        metadata = page_file.read_metadata(f)
+        opening = f.bytes_read
+        codec, boxes = metadata.codecs["qty"], metadata.pages["qty"]
+        values = page_file.read_rows(f, codec, boxes, start, stop)
+        if (start, stop) == (0, metadata.rows):
+            print(f"sum(qty) from {path.name}, told nothing = {sum(values)}")
+        else:
+            rows = f"rows {start}–{stop - 1}"
+            print(f"qty of {rows} from {path.name}, told nothing = {values}")
+        pages = f.bytes_read - opening
+        print(f"  tally: {f.tally()} (opening {opening}, pages {pages})")
 
 
 def packing(folder: Path) -> None:
@@ -232,6 +263,20 @@ def packing(folder: Path) -> None:
     every_way("sorted by name", by_name)
     in_runs = {"price": "run-length", "qty": "run-length", "name": "run-length"}
     write_and_read_back(folder / "sorted.bin", by_name, in_runs)
+
+    plain_path, smallest_path = folder / "plain.bin", folder / "smallest.bin"
+    write_and_read_back(plain_path, orders, {})
+    every_column = {column: "smallest" for column in COLUMNS}
+    for path, table in (
+        (smallest_path, orders),
+        (folder / "sorted-smallest.bin", by_name),
+    ):
+        pages = write_and_read_back(path, table, every_column)
+        chosen = ", ".join(f"{c} {packing_notes(boxes)}" for c, boxes in pages.items())
+        print(f"  chosen: {chosen}")
+    for start, stop in ((0, len(orders)), (10, 20)):
+        for path in (plain_path, smallest_path):
+            ask_qty(path, start, stop)
 
 
 def main() -> int:

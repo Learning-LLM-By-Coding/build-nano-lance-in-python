@@ -155,10 +155,10 @@ def test_packing_packs_every_column_every_way(tmp_path):
     )
     assert lines[start : start + 7] == [
         "every column packed every way, orders as placed (bytes, all pages):",
-        "  id: plain 8000, dictionary 9040, run-length 12000",
-        "  price: plain 8000, dictionary 1680, run-length 12000",
-        "  qty: plain 4000, dictionary 1280, run-length 8000",
-        "  name: plain 12000, dictionary 2000, run-length 16000",
+        "  id: plain 8000, dictionary 9040, run-length 12000, bit-packed 1212",
+        "  price: plain 8000, dictionary 1680, run-length 12000, bit-packed —",
+        "  qty: plain 4000, dictionary 1280, run-length 8000, bit-packed 760",
+        "  name: plain 12000, dictionary 2000, run-length 16000, bit-packed —",
         "write dictionary.bin: 15612 bytes, pages 12960 (plain: 32000)",
         "  read back, told nothing: same as the table? True",
     ]
@@ -171,10 +171,33 @@ def test_packing_stacks_the_sorted_orders_in_runs(tmp_path):
     )
     assert lines[start : start + 7] == [
         "every column packed every way, orders sorted by name (bytes, all pages):",
-        "  id: plain 8000, dictionary 9040, run-length 12000",
-        "  price: plain 8000, dictionary 1168, run-length 192",
-        "  qty: plain 4000, dictionary 1100, run-length 120",
-        "  name: plain 12000, dictionary 1232, run-length 256",
+        "  id: plain 8000, dictionary 9040, run-length 12000, bit-packed 1364",
+        "  price: plain 8000, dictionary 1168, run-length 192, bit-packed —",
+        "  qty: plain 4000, dictionary 1100, run-length 120, bit-packed 424",
+        "  name: plain 12000, dictionary 1232, run-length 256, bit-packed —",
         "write sorted.bin: 11168 bytes, pages 8568 (plain: 32000)",
         "  read back, told nothing: same as the table? True",
+    ]
+
+
+def test_packing_keeps_the_smallest_and_reads_fewer_bytes(tmp_path):
+    lines = run_packing(tmp_path)
+    start = lines.index("write smallest.bin: 8320 bytes, pages 5652 (plain: 32000)")
+    assert lines[start : start + 3] == [
+        "write smallest.bin: 8320 bytes, pages 5652 (plain: 32000)",
+        "  read back, told nothing: same as the table? True",
+        "  chosen: id bit-packed ×10, price dictionary ×10, "
+        "qty bit-packed ×10, name dictionary ×10",
+    ]
+    assert lines[-8:] == [
+        "sum(qty) from plain.bin, told nothing = 8125",
+        "  tally: reads 12, bytes read 6522, seeks 12 (opening 2522, pages 4000)",
+        "sum(qty) from smallest.bin, told nothing = 8125",
+        "  tally: reads 12, bytes read 3428, seeks 12 (opening 2668, pages 760)",
+        "qty of rows 10–19 from plain.bin, told nothing = "
+        "[40, 2, 1, 12, 4, 2, 3, 1, 40, 2]",
+        "  tally: reads 3, bytes read 2922, seeks 3 (opening 2522, pages 400)",
+        "qty of rows 10–19 from smallest.bin, told nothing = "
+        "[40, 2, 1, 12, 4, 2, 3, 1, 40, 2]",
+        "  tally: reads 3, bytes read 2744, seeks 3 (opening 2668, pages 76)",
     ]

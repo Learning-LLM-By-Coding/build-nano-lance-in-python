@@ -86,7 +86,8 @@ def write(
 ) -> dict[str, list[Page]]:
     """Write `rows` column by column, each column cut into pages of up to
     `rows_per_page` values. `encoding` names an encoding per column (a
-    column it leaves out is stored plain). Returns every column's pages."""
+    column it leaves out is stored plain); "smallest" picks, page by page,
+    whichever encoding gives the fewest bytes. Returns every column's pages."""
     chosen = encoding or {}
     pages: dict[str, list[Page]] = {}
     with open(path, "wb") as out:
@@ -94,10 +95,13 @@ def write(
             pages[column] = []
             name = chosen.get(column, "plain")
             for plain in plain_pages(rows, column, rows_per_page):
-                data = encodings.encode(name, codec, plain)
+                if name == "smallest":
+                    used, data = encodings.smallest(codec, plain)
+                else:
+                    used, data = name, encodings.encode(name, codec, plain)
                 n_rows = len(plain) // codec.size
                 page = Page(
-                    offset=out.tell(), size=len(data), rows=n_rows, encoding=name
+                    offset=out.tell(), size=len(data), rows=n_rows, encoding=used
                 )
                 pages[column].append(page)
                 out.write(data)

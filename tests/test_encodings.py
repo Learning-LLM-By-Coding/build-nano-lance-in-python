@@ -1,7 +1,7 @@
 import pytest
 
 from nanolance import encodings
-from nanolance.encodings import COUNT
+from nanolance.encodings import COUNT, WIDTH
 from nanolance.orders import COLUMNS, many_orders, pack_value
 
 
@@ -71,3 +71,43 @@ def test_run_length_stores_each_run_once_with_its_length():
 def test_run_length_without_runs_is_twice_as_large_as_plain():
     qty = [row[2] for row in many_orders(100)]  # no two neighbors are equal
     assert len(round_trip("run-length", "qty", qty)) == 100 * (4 + 4)  # plain: 400
+
+
+def test_bit_packing_keeps_only_the_bits_the_largest_value_needs():
+    raw = round_trip("bit-packed", "qty", [3, 1, 2])  # 2 bits each: 11, 01, 10
+    assert raw == WIDTH.pack(2) + bytes([0b10_01_11])
+
+
+def test_bit_packing_a_page_of_zeros_takes_no_bits_per_value():
+    assert round_trip("bit-packed", "qty", [0] * 100) == WIDTH.pack(0)
+
+
+def test_bit_packing_handles_the_widest_id():
+    raw = round_trip("bit-packed", "id", [0, 2**63 - 1])
+    assert raw[0] == 63
+
+
+@pytest.mark.parametrize(
+    ("column", "values"),
+    [("price", [4.25]), ("name", ["tape"]), ("qty", [-1, 5])],
+)
+def test_bit_packing_refuses_anything_but_whole_numbers_from_zero_up(column, values):
+    with pytest.raises(ValueError, match="bit-packing needs whole numbers"):
+        encodings.encode("bit-packed", COLUMNS[column], plain_bytes(column, values))
+
+
+@pytest.mark.parametrize(
+    ("column", "values", "expected"),
+    [
+        ("qty", [], "plain"),  # plain and run-length both 0 bytes: plain wins a tie
+        ("qty", [7], "bit-packed"),
+        ("name", [row[3] for row in many_orders(100)], "dictionary"),
+        ("price", [4.25] * 100, "run-length"),
+    ],
+)
+def test_the_smallest_encoding_is_chosen_page_by_page(column, values, expected):
+    codec = COLUMNS[column]
+    data = plain_bytes(column, values)
+    name, raw = encodings.smallest(codec, data)
+    assert name == expected
+    assert raw == encodings.encode(expected, codec, data)

@@ -16,6 +16,8 @@ from itertools import groupby
 COUNT = struct.Struct("<I")
 # Dictionary codes are one byte each, so a dictionary holds at most 256 values.
 MAX_DICTIONARY = 256
+# One byte at the start of a bit-packed page: how many bits each value takes.
+WIDTH = struct.Struct("<B")
 
 
 def split(codec: struct.Struct, data: bytes) -> list[bytes]:
@@ -87,6 +89,41 @@ def from_run_length(codec: struct.Struct, raw: bytes, rows: int) -> bytes:
     return b"".join(plain)
 
 
+def whole_numbers(codec: struct.Struct, data: bytes) -> list[int]:
+    """The page's values as whole numbers, refusing any other kind of value."""
+    values = [value for (value,) in codec.iter_unpack(data)]
+    if not all(isinstance(value, int) and value >= 0 for value in values):
+        raise ValueError("bit-packing needs whole numbers that are not negative")
+    return values
+
+
+def bit_packed(codec: struct.Struct, data: bytes) -> bytes:
+    """Analogy: snug compartments — every compartment in the box cut down to
+    the size its largest value needs.
+
+    Layout: WIDTH (the bits per value: the largest value's bit length), then
+    every value in exactly that many bits, value 0 in the lowest bits, the
+    last byte filled up with zero bits.
+    """
+    values = whole_numbers(codec, data)
+    width = max(values, default=0).bit_length()
+    packed = 0
+    for position, value in enumerate(values):
+        packed |= value << (position * width)
+    n_bytes = (len(values) * width + 7) // 8  # round up to whole bytes
+    return WIDTH.pack(width) + packed.to_bytes(n_bytes, "little")
+
+
+def from_bit_packed(codec: struct.Struct, raw: bytes, rows: int) -> bytes:
+    """Decode a bit-packed page: cut `rows` values of WIDTH bits each."""
+    (width,) = WIDTH.unpack(raw[: WIDTH.size])
+    packed = int.from_bytes(raw[WIDTH.size :], "little")
+    mask = (1 << width) - 1  # `width` one-bits
+    return b"".join(
+        codec.pack((packed >> (position * width)) & mask) for position in range(rows)
+    )
+
+
 Encoder = Callable[[struct.Struct, bytes], bytes]
 Decoder = Callable[[struct.Struct, bytes, int], bytes]
 
@@ -96,6 +133,7 @@ ENCODINGS: dict[str, tuple[Encoder, Decoder]] = {
     "plain": (plain, from_plain),
     "dictionary": (dictionary, from_dictionary),
     "run-length": (run_length, from_run_length),
+    "bit-packed": (bit_packed, from_bit_packed),
 }
 
 
@@ -109,3 +147,22 @@ def decode(name: str, codec: struct.Struct, raw: bytes, rows: int) -> bytes:
     """Decode one page's stored bytes back to its plain bytes."""
     _, decoder = ENCODINGS[name]
     return decoder(codec, raw, rows)
+
+
+def smallest(codec: struct.Struct, data: bytes) -> tuple[str, bytes]:
+    """Analogy: the weigh-in — the box packed every way, each packing weighed,
+    and the lightest kept.
+
+    Encode the page with every encoding that accepts its values and return
+    the name and bytes of the smallest result; a tie keeps the encoding that
+    comes first in ENCODINGS, so plain wins a draw.
+    """
+    best_name, best = "plain", data
+    for name in ENCODINGS:
+        try:
+            raw = encode(name, codec, data)
+        except ValueError:
+            continue  # this encoding refuses these values
+        if len(raw) < len(best):
+            best_name, best = name, raw
+    return best_name, best
