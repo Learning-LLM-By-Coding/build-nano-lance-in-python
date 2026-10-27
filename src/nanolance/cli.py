@@ -6,7 +6,14 @@ from collections import Counter
 from itertools import groupby
 from pathlib import Path
 
-from nanolance import __version__, column_layout, encodings, page_file, row_layout
+from nanolance import (
+    __version__,
+    column_layout,
+    encodings,
+    page_file,
+    row_groups,
+    row_layout,
+)
 from nanolance.counting import CountingFile
 from nanolance.orders import (
     COLUMNS,
@@ -509,6 +516,29 @@ def take(folder: Path) -> None:
     with CountingFile(shop_path) as f:
         rows = page_file.take(f, metadata, PICK_LIST, columns)
         print(f"take box by box: the same rows? {rows == scanned}")
+        print(f"  tally: {f.tally()}")
+
+    groups_path = folder / "groups.bin"
+    pallets = row_groups.write(
+        groups_path, tagged, encoding=every_column, columns=TAGGED_COLUMNS
+    )
+    size = groups_path.stat().st_size
+    print(
+        f"write {groups_path.name}: {len(pallets['id'])} row groups of "
+        f"{row_groups.ROWS_PER_GROUP} orders, {size} bytes"
+    )
+    for n in range(2):
+        at = ", ".join(f"{c} {chunks[n].offset}" for c, chunks in pallets.items())
+        print(f"  group {n}: {at}")
+    with CountingFile(groups_path) as f:
+        grouped = page_file.read_metadata(f)
+        print(f"open it once and keep the box lists — tally: {f.tally()}")
+    starts = page_file.page_starts(grouped.pages["qty"])
+    boxes = sorted({page_file.locate(starts, row_id)[0] for row_id in PICK_LIST})
+    print(f"  the pick list: {len(boxes)} groups, {boxes}")
+    with CountingFile(groups_path) as f:
+        rows = page_file.take(f, grouped, PICK_LIST, columns)
+        print(f"take from the row groups: the same rows? {rows == scanned}")
         print(f"  tally: {f.tally()}")
 
 

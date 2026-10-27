@@ -162,23 +162,33 @@ def write(
                 page, data = pack_page(kind, name, values, out.tell())
                 pages[column].append(page)
                 out.write(data)
-
-        metadata = {
-            "rows": len(rows),
-            "columns": [
-                {
-                    "name": column,
-                    "format": shapes.format_of(kind),
-                    "pages": [entry(page) for page in pages[column]],
-                }
-                for column, kind in columns.items()
-            ],
-        }
-        raw = json.dumps(metadata, separators=(",", ":")).encode("utf-8")
-        metadata_offset = out.tell()
-        out.write(raw)
-        out.write(FOOTER.pack(metadata_offset, len(raw), VERSION, MAGIC))
+        finish(out, len(rows), columns, pages)
     return pages
+
+
+def finish(
+    out: BinaryIO, n_rows: int, columns: dict[str, Kind], pages: dict[str, list[Page]]
+) -> None:
+    """Analogy: write the box lists after the last box, then hang the wall card.
+
+    Write the column metadata (as JSON) at the current position, then the
+    footer that says where it is.
+    """
+    metadata = {
+        "rows": n_rows,
+        "columns": [
+            {
+                "name": column,
+                "format": shapes.format_of(kind),
+                "pages": [entry(page) for page in pages[column]],
+            }
+            for column, kind in columns.items()
+        ],
+    }
+    raw = json.dumps(metadata, separators=(",", ":")).encode("utf-8")
+    metadata_offset = out.tell()
+    out.write(raw)
+    out.write(FOOTER.pack(metadata_offset, len(raw), VERSION, MAGIC))
 
 
 def read_page(f: BinaryIO, codec: Kind, page: Page) -> list[Value]:
