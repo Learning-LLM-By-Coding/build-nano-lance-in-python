@@ -354,3 +354,23 @@ def test_a_row_id_the_file_does_not_hold_is_refused_before_any_read(tmp_path, ro
         with pytest.raises(IndexError, match=f"row id {row_id}: the file holds rows"):
             page_file.take(f, metadata, [5, row_id], ["qty"])
         assert f.reads == 0
+
+
+@pytest.mark.parametrize(
+    ("rows_per_page", "scan", "take"),
+    [(10, (100, 4000), (2, 2 * 40)), (1000, (1, 4000), (1, 4000))],
+)
+def test_smaller_pages_make_a_take_cheaper_and_a_scan_take_more_reads(
+    tmp_path, rows_per_page, scan, take
+):
+    path = tmp_path / "pages.bin"
+    page_file.write(path, many_orders(1000), rows_per_page)
+    with CountingFile(path) as f:
+        metadata = page_file.read_metadata(f)
+    codec, pages = metadata.codecs["qty"], metadata.pages["qty"]
+    with CountingFile(path) as f:
+        page_file.read_column(f, codec, pages)
+        assert (f.reads, f.bytes_read) == scan
+    with CountingFile(path) as f:
+        assert page_file.take(f, metadata, [5, 500], ["qty"]) == [(12,), (1,)]
+        assert (f.reads, f.bytes_read) == take

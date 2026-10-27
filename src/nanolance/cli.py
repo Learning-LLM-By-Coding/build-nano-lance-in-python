@@ -470,6 +470,28 @@ def shapes(folder: Path) -> None:
     print(f"  tally: {tally}")
 
 
+def costs(path: Path, row_ids: list[int]) -> str:
+    """Analogy: what one warehouse costs to open, to stock-count, and to fill
+    a pick list from.
+
+    One row of the box-size table: the bytes of the metadata, then the reads
+    and bytes of a scan of every column and of a take of `row_ids`, both with
+    the metadata already in hand.
+    """
+    with CountingFile(path) as f:
+        metadata = page_file.read_metadata(f)
+        opening = f.bytes_read
+    columns = list(metadata.codecs)
+    with CountingFile(path) as f:
+        for column in columns:
+            page_file.read_column(f, metadata.codecs[column], metadata.pages[column])
+        scan = f"{f.reads}, {f.bytes_read}"
+    with CountingFile(path) as f:
+        page_file.take(f, metadata, row_ids, columns)
+        taken = f"{f.reads}, {f.bytes_read}"
+    return f"{opening:>9} | {scan:>12} | {taken:>12}"
+
+
 # Analogy: a customer's pick list — ten orders, scattered across the warehouse.
 #
 # Ten row ids of a 10,000-row table: positions counted from 0 (row k holds the
@@ -540,6 +562,15 @@ def take(folder: Path) -> None:
         rows = page_file.take(f, grouped, PICK_LIST, columns)
         print(f"take from the row groups: the same rows? {rows == scanned}")
         print(f"  tally: {f.tally()}")
+
+    print("box size: what a scan and the pick list read, every column (reads, bytes)")
+    print(f"  {'rows per box':>14} | box lists | {'scan':>12} | {'pick list':>12}")
+    for rows_per_page in (10, 100, 2500, 10_000):
+        path = folder / f"shop-{rows_per_page}.bin"
+        page_file.write(path, tagged, rows_per_page, every_column, TAGGED_COLUMNS)
+        print(f"  {rows_per_page:>14} | {costs(path, PICK_LIST)}")
+    row_groups_size = f"{row_groups.ROWS_PER_GROUP} in groups"
+    print(f"  {row_groups_size:>14} | {costs(groups_path, PICK_LIST)}")
 
 
 def main() -> int:

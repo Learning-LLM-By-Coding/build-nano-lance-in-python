@@ -337,7 +337,7 @@ def test_take_box_by_box_reads_only_the_boxes_on_the_list(tmp_path):
 def test_take_from_row_groups_reads_every_chunk(tmp_path):
     lines = run_take(tmp_path)
     start = lines.index("write groups.bin: 4 row groups of 2500 orders, 200201 bytes")
-    assert lines[start:] == [
+    assert lines[start : start + 7] == [
         "write groups.bin: 4 row groups of 2500 orders, 200201 bytes",
         "  group 0: id 0, price 3751, qty 6624, name 8500, tags 30061",
         "  group 1: id 48855, price 52919, qty 55792, name 57668, tags 79239",
@@ -346,4 +346,20 @@ def test_take_from_row_groups_reads_every_chunk(tmp_path):
         "  the pick list: 4 groups, [0, 1, 2, 3]",
         "take from the row groups: the same rows? True",
         "  tally: reads 20, bytes read 196701, seeks 20",
+    ]
+
+
+def test_take_counts_scan_and_pick_list_for_every_box_size(tmp_path):
+    lines = run_take(tmp_path)
+    start = lines.index(
+        "box size: what a scan and the pick list read, every column (reads, bytes)"
+    )
+    assert lines[start:] == [
+        "box size: what a scan and the pick list read, every column (reads, bytes)",
+        "    rows per box | box lists |         scan |    pick list",
+        "              10 |    753278 | 5000, 238534 |     50, 2355",
+        "             100 |     77910 |  500, 185577 |    45, 16672",
+        "            2500 |      3496 |   20, 196701 |   20, 196701",
+        "           10000 |      1084 |    5, 204917 |    5, 204917",
+        "  2500 in groups |      3500 |   20, 196701 |   20, 196701",
     ]

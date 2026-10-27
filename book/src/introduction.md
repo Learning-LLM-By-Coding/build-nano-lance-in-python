@@ -109,7 +109,7 @@ book is written.
 | 2 | A file of pages | Day 1's file at a thousand rows · columns cut into pages · metadata and a footer, read from the end · refusing a file by name | 2 h |
 | 3 | Encodings | What a page holds · plain & dictionary, each page naming its encoding · run-length · bit-packing & the smallest per page — bytes saved, bytes read, round-trip proofs | 2 h |
 | 4 | Strings, lists, and missing values | What fixed widths cannot say · strings as offsets and data, in trays · lists as offsets into strings · validity bitmaps — bytes saved, one value in two reads | 2 h |
-| 5 | Random access | Row id → page · a Parquet-style row-group layout to compare · bytes and seeks counted | 2 h |
+| 5 | Random access | A take by scanning · row id → page · a Parquet-style row-group layout · page size: scan vs take — bytes and reads counted | 2 h |
 | 6 | The table | Fragments · a manifest per version · time travel | 2 h |
 | 7 | Changing data | Appends · deletion files · updates · optimistic commits & conflict detection | 2.5 h |
 | 8 | Schema evolution | Add a column without rewriting · drop a column | 1.5 h |

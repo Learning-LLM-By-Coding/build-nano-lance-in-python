@@ -33,6 +33,7 @@ introduced it, if you want the full explanation again.
 | 2 | [The wall card at the back](#day-2--the-wall-card-at-the-back) | sealed boxes, the box list, the wall card at the back, the stamp |
 | 3 | [The packer's bench](#day-3--the-packers-bench) | the packer and packing methods, the lid legend, stacks, snug compartments, the packing note, the weigh-in |
 | 4 | [Trays in the box](#day-4--trays-in-the-box) | trays, the letter strip and its end marks, bundles, the roll call |
+| 5 | [The pick list](#day-5--the-pick-list) | the pick list, start numbers, pallets, the box size |
 
 ## Day 1 — crates or aisles
 
@@ -301,5 +302,62 @@ picker trained on edition 2 turns around.
 *What it is:* one bit per value — 1 when present, 0 when missing (`None`) — with bit 0 in the lowest bit of the first byte, as in Arrow. A missing value keeps an empty place in the page's other buffers, which the bitmap hides. Only a page with a missing value has one, and it is always stored plain. Real Lance expresses the same facts with definition levels instead.
 
 *In the story:* one answer per order — present, or absent; a box with nothing missing has no roll call.
+
+</div>
+
+## Day 5 — the pick list
+
+The shop's orders now fill 10,000 rows, and a customer hands the picker
+**a pick list**: ten orders, scattered across the warehouse, in the
+customer's own order. The slow way to fill it is a stock count of every
+aisle — every box carried back for ten orders. So the picker learns
+**start numbers**: the [box list](#box-list) already says how many orders
+each box holds, and adding them up gives the number each box starts
+at, so one look tells the picker which box holds order 7,342 and where
+in it. Each box the list needs is carried back once, even when two
+orders share it. Across the street, a second warehouse ships its orders
+on **pallets**: each pallet carries a few thousand whole orders, with
+every aisle's share wrapped as one piece that must be unwrapped whole,
+so the same ten orders mean unwrapping every pallet. Last, the picker
+weighs **the box size**: small boxes for pick lists, big ones for stock
+counts — and a pallet behaves like any big box.
+
+<div class="concept" id="pick-list">
+
+**The pick list — a take** · [Day 5, section A](day-05-random-access.md#section-a--a-pick-list-filled-by-scanning)
+
+*What it is:* fetching rows by their row numbers — positions in the table, from 0 — in the order asked, repeats allowed, with the columns asked for (`take`). Scanning every column first (`take_by_scan`) reads the whole table for any list; reading only the pages that hold the rows reads a fraction. Training jobs that sample rows and searches that return row numbers both ask this question.
+
+*In the story:* a customer's list of orders to collect, scattered across the warehouse; a [customer pickup](#pickup) is a pick list of one.
+
+</div>
+
+<div class="concept" id="start-numbers">
+
+**Start numbers — row id to page** · [Day 5, section B](day-05-random-access.md#section-b--start-numbers-only-the-boxes-on-the-list)
+
+*What it is:* the row number of each page's first value, a running total of the pages' row counts (`page_starts`). A row's page is the last one starting at or before it, found by binary search (`locate`, with `bisect_right`), and its place in the page is the row number minus that start. A take reads each page it needs once, and unpacks it on its own.
+
+*In the story:* the number of the first order in every box, added up from the box list; one look says which box holds an order, and where in it.
+
+</div>
+
+<div class="concept" id="pallets">
+
+**Pallets — Parquet-style row groups** · [Day 5, section C](day-05-random-access.md#section-c--pallets-a-parquet-style-row-group-file)
+
+*What it is:* rows cut into groups (here 2,500 rows); inside a group, each column's values form one *column chunk*, and the chunks are stored group after group (`row_groups.write`). Here each chunk is packed as one unit, so one value costs the whole chunk — Parquet's worst case; real Parquet can cut chunks into pages, and its optional page index lets a reader reach one page. Lance has no row groups at all.
+
+*In the story:* the warehouse across the street, which ships a few thousand whole orders per pallet, each aisle's share wrapped as one piece that must be unwrapped whole.
+
+</div>
+
+<div class="concept" id="box-size">
+
+**The box size — scan against take** · [Day 5, section D](day-05-random-access.md#section-d--the-box-size-scan-against-take)
+
+*What it is:* rows per page decides what a take and a scan each cost. Small pages make a take read little, but a scan needs many reads and the metadata grows; big pages are the other way round. For a take, a row group behaves exactly like a page of the same size. Real Lance keeps pages big (about 8 MB) and reads small mini-blocks inside them, to have both.
+
+*In the story:* small boxes for pick lists, big ones for stock counts; a pallet is one more big box.
 
 </div>
