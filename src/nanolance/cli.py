@@ -3,15 +3,17 @@
 import argparse
 from pathlib import Path
 
-from nanolance import __version__, row_layout
+from nanolance import __version__, column_layout, row_layout
 from nanolance.counting import CountingFile
 from nanolance.orders import COLUMNS, ORDERS, ROW_WIDTH
 
 
 def layouts(folder: Path) -> None:
-    """Analogy: open the warehouse and pack the orders into crates.
+    """Analogy: open the warehouse, pack the orders both ways, and ask each
+    the same questions.
 
-    Store the orders table as rows, read it back, and print every step.
+    Store the orders table as rows and as columns, query both, and print
+    every step with its tally.
     """
     folder.mkdir(parents=True, exist_ok=True)
     n_rows = len(ORDERS)
@@ -34,6 +36,21 @@ def layouts(folder: Path) -> None:
         total = row_layout.sum_column(f, "qty", n_rows)
         print(f"sum(qty) from {rows_path.name} = {total}")
         print(f"  tally: {f.tally()} (qty needs only {needed} of them)")
+
+    columns_path = folder / "columns.bin"
+    column_layout.write(columns_path, ORDERS)
+    size = columns_path.stat().st_size
+    parts = " + ".join(f"{c} {n_rows * codec.size}" for c, codec in COLUMNS.items())
+    print(f"write {columns_path.name}: {size} bytes = {parts}")
+    with CountingFile(columns_path) as f:
+        same = column_layout.read_all(f, n_rows) == ORDERS
+        print(f"read {columns_path.name} back: same as the table? {same}")
+        print(f"  tally: {f.tally()}")
+
+    with CountingFile(columns_path) as f:
+        total = column_layout.sum_column(f, "qty", n_rows)
+        print(f"sum(qty) from {columns_path.name} = {total}")
+        print(f"  tally: {f.tally()}")
 
 
 def main() -> int:

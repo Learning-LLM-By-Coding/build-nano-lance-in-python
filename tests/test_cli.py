@@ -28,3 +28,17 @@ def test_layouts_tallies_what_each_question_reads(tmp_path):
         "sum(qty) from rows.bin = 65",
         "  tally: reads 8, bytes read 256, seeks 0 (qty needs only 32 of them)",
     ]
+
+
+def test_layouts_stores_the_table_as_columns_too(tmp_path):
+    lines = run_layouts(tmp_path)
+    start = lines.index(
+        "write columns.bin: 256 bytes = id 64 + price 64 + qty 32 + name 96"
+    )
+    assert lines[start : start + 5] == [
+        "write columns.bin: 256 bytes = id 64 + price 64 + qty 32 + name 96",
+        "read columns.bin back: same as the table? True",
+        "  tally: reads 4, bytes read 256, seeks 4",
+        "sum(qty) from columns.bin = 65",
+        "  tally: reads 1, bytes read 32, seeks 1",
+    ]
