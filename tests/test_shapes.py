@@ -84,3 +84,37 @@ def test_lists_give_back_exactly_what_went_in(values):
     trays = shapes.trays(STRING_LIST, values)
     assert list(trays) == ["list offsets", "offsets", "data"]
     assert shapes.values_from(STRING_LIST, trays) == values
+
+
+def test_the_validity_bitmap_has_one_bit_per_value_lowest_bit_first():
+    values = [0, 1, None, 2, None, 3]  # the example in Arrow's documentation
+    assert shapes.roll_call(values) == bytes([0b00101011])
+    assert shapes.present(bytes([0b00101011]), 6) == [
+        True,
+        True,
+        False,
+        True,
+        False,
+        True,
+    ]
+
+
+def test_a_page_without_missing_values_has_no_validity_tray():
+    assert "validity" not in shapes.trays(STRING, ["tape", ""])
+
+
+NULL_PAGES = {
+    "all-missing qty": (COLUMNS["qty"], [None] * 100),
+    "all-missing names": (STRING, [None] * 9),
+    "all-missing tags": (STRING_LIST, [None, None]),
+    "missing and empty strings": (STRING, [None, "", "tape", None]),
+    "missing and empty lists": (STRING_LIST, [[], None, [""], None]),
+    "missing prices across a byte": (COLUMNS["price"], [None, 4.25] * 5),
+}
+
+
+@pytest.mark.parametrize(("kind", "values"), NULL_PAGES.values(), ids=NULL_PAGES.keys())
+def test_missing_values_come_back_missing(kind, values):
+    trays = shapes.trays(kind, values)
+    assert list(trays)[0] == "validity"
+    assert shapes.values_from(kind, trays) == values

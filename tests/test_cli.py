@@ -264,3 +264,25 @@ def test_shapes_stores_tags_as_lists(tmp_path):
         "offsets bit-packed 1065 + data bit-packed 4500",
         "    read back, told nothing: same as the table? True",
     ]
+
+
+def test_shapes_stores_the_shop_table_with_its_missing_prices(tmp_path):
+    lines = run_shapes(tmp_path)
+    start = lines.index("write shop.bin: 26169 bytes, every column packed smallest")
+    assert lines[start:] == [
+        "write shop.bin: 26169 bytes, every column packed smallest",
+        "  id: 1212 = bit-packed 1212",
+        "  price: 1730 = validity plain 130 + values dictionary 1600",
+        "  qty: 760 = bit-packed 760",
+        "  name: 8030 = offsets bit-packed 1280 + data plain 6750",
+        "  tags: 6465 = list offsets bit-packed 900 + offsets bit-packed 1065 + "
+        "data bit-packed 4500",
+        "  read back, told nothing: same as the table? True",
+        "sum(qty) from shop.bin, told nothing = 8125",
+        "  tally: reads 12, bytes read 8732, seeks 12 (opening 7972, pages 760)",
+        "average price from shop.bin = 10.92, 250 missing",
+        "  tally: reads 12, bytes read 9702, seeks 12 (opening 7972, pages 1730)",
+        "names of rows 10–19 from shop.bin = ['washers', 'tape', 'drill bits Ø6', "
+        "'nails', 'gloves', 'padlock', 'bolts', 'hammer', 'washers', 'tape']",
+        "  tally: reads 3, bytes read 8770, seeks 3 (opening 7972, pages 798)",
+    ]

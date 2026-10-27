@@ -13,6 +13,7 @@ from nanolance.orders import (
     NAME_WIDTH,
     ORDERS,
     ROW_WIDTH,
+    TAGGED_COLUMNS,
     TAGGED_ORDERS,
     Row,
     many_orders,
@@ -20,7 +21,14 @@ from nanolance.orders import (
     pack_value,
 )
 from nanolance.page_file import ROWS_PER_PAGE, Page
-from nanolance.shapes import OFFSET, STRING, STRING_LIST, fixed_values, list_trays
+from nanolance.shapes import (
+    OFFSET,
+    STRING,
+    STRING_LIST,
+    Value,
+    fixed_values,
+    list_trays,
+)
 
 
 def layouts(folder: Path) -> None:
@@ -307,12 +315,30 @@ def read_back(path: Path) -> list[tuple]:
 
 def tray_bytes(boxes: list[Page]) -> str:
     """The bytes of one column's trays, by tray and packing note, e.g.
-    "offsets plain 4040 + data plain 6250"."""
+    "offsets plain 4040 + data plain 6250"; a page without trays counts
+    under its own packing note."""
     totals = Counter()
     for page in boxes:
+        if not page.trays:
+            totals[page.encoding] += page.size
         for tray in page.trays:
             totals[f"{tray.name} {tray.encoding}"] += tray.size
     return " + ".join(f"{tray} {size}" for tray, size in totals.items())
+
+
+def ask(path: Path, column: str, start: int, stop: int) -> tuple[list[Value], str]:
+    """Analogy: a picker who knows nothing fetches a stretch of one aisle.
+
+    Rows `start` to `stop` of `column` from a fresh open, and the tally, its
+    bytes split into the opening (footer and metadata) and the pages.
+    """
+    with CountingFile(path) as f:
+        metadata = page_file.read_metadata(f)
+        opening = f.bytes_read
+        kind, boxes = metadata.codecs[column], metadata.pages[column]
+        values = page_file.read_rows(f, kind, boxes, start, stop)
+        pages = f.bytes_read - opening
+        return values, f"{f.tally()} (opening {opening}, pages {pages})"
 
 
 def shapes(folder: Path) -> None:
@@ -409,6 +435,32 @@ def shapes(folder: Path) -> None:
         print(f"  {path.name}: {stored} bytes = {tray_bytes(boxes['tags'])}")
         same = read_back(path) == tags
         print(f"    read back, told nothing: same as the table? {same}")
+
+    shop_path = folder / "shop.bin"
+    every_column = {column: "smallest" for column in TAGGED_COLUMNS}
+    boxes = page_file.write(
+        shop_path, tagged, encoding=every_column, columns=TAGGED_COLUMNS
+    )
+    size = shop_path.stat().st_size
+    print(f"write {shop_path.name}: {size} bytes, every column packed smallest")
+    for column, pages in boxes.items():
+        stored = sum(page.size for page in pages)
+        print(f"  {column}: {stored} = {tray_bytes(pages)}")
+    same = read_back(shop_path) == tagged
+    print(f"  read back, told nothing: same as the table? {same}")
+
+    qty, tally = ask(shop_path, "qty", 0, len(tagged))
+    print(f"sum(qty) from {shop_path.name}, told nothing = {sum(qty)}")
+    print(f"  tally: {tally}")
+    prices, tally = ask(shop_path, "price", 0, len(tagged))
+    known = [price for price in prices if price is not None]
+    average = sum(known) / len(known)
+    missing = len(prices) - len(known)
+    print(f"average price from {shop_path.name} = {average:.2f}, {missing} missing")
+    print(f"  tally: {tally}")
+    names, tally = ask(shop_path, "name", 10, 20)
+    print(f"names of rows 10–19 from {shop_path.name} = {names}")
+    print(f"  tally: {tally}")
 
 
 def main() -> int:

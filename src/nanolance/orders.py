@@ -2,6 +2,8 @@
 
 import struct
 
+from nanolance.shapes import STRING, STRING_LIST
+
 NAME_WIDTH = 12
 
 # Analogy: the packing rule — every crate has the same four compartments,
@@ -51,6 +53,10 @@ TAGGED_ORDERS: list[TaggedRow] = [
     (107, None, 4, "gloves", []),
     (108, 15.0, 2, "padlock", ["gift", "fragile"]),
 ]
+
+# Day 4's table as a page file stores it: the same id, price, and qty as
+# COLUMNS; name becomes a string of any length; tags a list of strings.
+TAGGED_COLUMNS = {**COLUMNS, "name": STRING, "tags": STRING_LIST}
 
 
 def pack_value(column: str, value: int | float | str) -> bytes:

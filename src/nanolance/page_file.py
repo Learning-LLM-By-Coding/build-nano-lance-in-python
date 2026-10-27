@@ -122,7 +122,8 @@ def pack_page(
     trays, parts = [], []
     for tray_name, plain in plain_trays.items():
         codec = shapes.tray_codec(kind, tray_name)
-        used, stored = pack(name, codec, plain)
+        choice = "plain" if tray_name == "validity" else name  # bitmaps stay plain
+        used, stored = pack(choice, codec, plain)
         trays.append(Tray(tray_name, len(stored), len(plain) // codec.size, used))
         parts.append(stored)
     data = b"".join(parts)

@@ -108,7 +108,7 @@ book is written.
 | 1 | Rows vs columns | One table stored row by row · a counting file: bytes read for a one-column question · the same table stored column by column · fetching one whole row: where rows win | 2 h |
 | 2 | A file of pages | Day 1's file at a thousand rows · columns cut into pages · metadata and a footer, read from the end · refusing a file by name | 2 h |
 | 3 | Encodings | What a page holds · plain & dictionary, each page naming its encoding · run-length · bit-packing & the smallest per page — bytes saved, bytes read, round-trip proofs | 2 h |
-| 4 | Strings, lists, and missing values | Offsets buffers · validity bitmaps · lists | 2 h |
+| 4 | Strings, lists, and missing values | What fixed widths cannot say · strings as offsets and data, in trays · lists as offsets into strings · validity bitmaps — bytes saved, one value in two reads | 2 h |
 | 5 | Random access | Row id → page · a Parquet-style row-group layout to compare · bytes and seeks counted | 2 h |
 | 6 | The table | Fragments · a manifest per version · time travel | 2 h |
 | 7 | Changing data | Appends · deletion files · updates · optimistic commits & conflict detection | 2.5 h |

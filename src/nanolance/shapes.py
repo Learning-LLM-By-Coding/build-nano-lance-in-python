@@ -1,10 +1,11 @@
-"""Analogy: trays inside a box — values of any length kept in trays of
-fixed-size compartments, so the packer's methods still work on every tray.
+"""Analogy: trays inside a box — values of any length, and values that are
+missing, kept in trays of fixed-size compartments, so the packer's methods
+still work on every tray.
 
-Variable-length values. A page that holds them is stored as several
-buffers ("trays"), each one a run of fixed-width values that Day 3's
-encodings can pack: OFFSET-wide positions, and BYTE-wide UTF-8 text. Strings
-and lists follow Apache Arrow's variable-size binary and list layouts.
+Variable-length and missing values. A page that holds them is stored as
+several buffers ("trays"), each one a run of fixed-width values that Day 3's
+encodings can pack: OFFSET-wide positions, BYTE-wide UTF-8 text, and a
+validity bitmap. Strings, lists, and validity follow Apache Arrow's layouts.
 """
 
 import struct
@@ -12,7 +13,7 @@ from itertools import pairwise
 
 # One offset: a position in a page's text, 4 bytes, so up to 4 GiB per page.
 OFFSET = struct.Struct("<I")
-# One byte of UTF-8 text.
+# One byte of UTF-8 text, or of a validity bitmap.
 BYTE = struct.Struct("<B")
 
 # The names variable-length columns record as their format: text, and a
@@ -23,7 +24,7 @@ STRING_LIST = "list<string>"
 # A column's kind: a fixed-width codec (Days 1–3), or the name of a
 # variable-length kind.
 Kind = struct.Struct | str
-Value = int | float | str | list[str]
+Value = int | float | str | list[str] | None  # None: missing
 
 
 def kind_of(format_name: str) -> Kind:
@@ -92,14 +93,38 @@ def lists_from(trays: dict[str, bytes]) -> list[list[str]]:
     return [items[start:stop] for start, stop in spans(trays["list offsets"])]
 
 
+def roll_call(values: list[Value]) -> bytes:
+    """Analogy: the roll call — one answer per value: present, or absent.
+
+    A validity bitmap: bit k is 1 when value k is present (not None), bit 0
+    in the lowest bit of the first byte, as in Arrow; len(values) bits,
+    rounded up to whole bytes.
+    """
+    bits = 0
+    for position, value in enumerate(values):
+        if value is not None:
+            bits |= 1 << position
+    return bits.to_bytes((len(values) + 7) // 8, "little")
+
+
+def present(raw: bytes, rows: int) -> list[bool]:
+    """For each of `rows` values, whether the validity bitmap marks it present."""
+    bits = int.from_bytes(raw, "little")
+    return [(bits >> position) & 1 == 1 for position in range(rows)]
+
+
 def fixed_tray(codec: struct.Struct, values: list[Value]) -> bytes:
     """Analogy: Day 1's packing rule, for any compartment size.
 
     Values back to back at the codec's width. Text is UTF-8, zero-padded,
-    and refused when it needs more bytes than the width.
+    and refused when it needs more bytes than the width. A missing value
+    takes its width in zero bytes.
     """
     parts = []
     for value in values:
+        if value is None:
+            parts.append(bytes(codec.size))
+            continue
         if isinstance(value, str):
             value = value.encode("utf-8")
             if len(value) > codec.size:
@@ -125,28 +150,43 @@ def trays(kind: Kind, values: list[Value]) -> dict[str, bytes]:
 
     One page's values as plain trays, by name: a fixed-width column has one,
     "values"; a string column has "offsets" and "data"; a list column has
-    "list offsets" before those two.
+    "list offsets" before those two. A page with a missing value starts with
+    a "validity" tray, and stores each missing value as an empty one ("",
+    [], or zero bytes) that the validity bitmap hides.
     """
+    stored = {}
+    if None in values:
+        stored["validity"] = roll_call(values)
     if kind == STRING:
-        return string_trays(values)
-    if kind == STRING_LIST:
-        return list_trays(values)
-    return {"values": fixed_tray(kind, values)}
+        stored.update(string_trays(["" if v is None else v for v in values]))
+    elif kind == STRING_LIST:
+        stored.update(list_trays([[] if v is None else v for v in values]))
+    else:
+        stored["values"] = fixed_tray(kind, values)
+    return stored
 
 
 def tray_codec(kind: Kind, name: str) -> struct.Struct:
     """The fixed width of one tray's values, which its encoding works on."""
     if name in ("list offsets", "offsets"):
         return OFFSET
-    if name == "data":
+    if name in ("data", "validity"):
         return BYTE
     return kind  # "values": the column's own codec
 
 
 def values_from(kind: Kind, trays: dict[str, bytes]) -> list[Value]:
-    """One page's values back from its decoded (plain) trays."""
+    """One page's values back from its decoded (plain) trays; a value the
+    validity bitmap marks missing comes back as None."""
     if kind == STRING:
-        return strings_from(trays)
-    if kind == STRING_LIST:
-        return lists_from(trays)
-    return fixed_values(kind, trays["values"])
+        values = strings_from(trays)
+    elif kind == STRING_LIST:
+        values = lists_from(trays)
+    else:
+        values = fixed_values(kind, trays["values"])
+    if "validity" in trays:
+        here = present(trays["validity"], len(values))
+        values = [
+            v if is_here else None for v, is_here in zip(values, here, strict=True)
+        ]
+    return values

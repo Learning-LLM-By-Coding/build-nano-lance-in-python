@@ -4,7 +4,14 @@ import pytest
 
 from nanolance import column_layout, page_file
 from nanolance.counting import CountingFile
-from nanolance.orders import COLUMNS, ORDERS, TAGGED_ORDERS, many_orders
+from nanolance.orders import (
+    COLUMNS,
+    ORDERS,
+    TAGGED_COLUMNS,
+    TAGGED_ORDERS,
+    many_orders,
+    many_tagged_orders,
+)
 from nanolance.page_file import FOOTER, MAGIC, VERSION, Page, Tray
 from nanolance.shapes import STRING
 
@@ -231,3 +238,41 @@ def test_a_version_2_file_still_reads(tmp_path):
         assert metadata.version == 2
         names = page_file.read_column(f, COLUMNS["name"], metadata.pages["name"])
     assert names == [row[3] for row in orders]
+
+
+def test_an_all_missing_page_reads_back_missing_and_its_bitmap_stays_plain(tmp_path):
+    path = tmp_path / "prices.bin"
+    prices = [(None,)] * 100 + [(4.25,)] * 100
+    pages = page_file.write(
+        path,
+        prices,
+        encoding={"price": "smallest"},
+        columns={"price": COLUMNS["price"]},
+    )
+    first, second = pages["price"]
+    assert [(tray.name, tray.encoding) for tray in first.trays] == [
+        ("validity", "plain"),  # bit-packing 13 zero bytes would leave 1
+        ("values", "run-length"),
+    ]
+    assert second.trays == ()  # nothing missing: a page as on Day 3
+    with CountingFile(path) as f:
+        metadata = page_file.read_metadata(f)
+        values = page_file.read_column(
+            f, metadata.codecs["price"], metadata.pages["price"]
+        )
+    assert values == [price for (price,) in prices]
+
+
+def test_the_shop_table_round_trips_every_column_every_way(tmp_path):
+    path = tmp_path / "shop.bin"
+    orders = many_tagged_orders(1000)
+    for name in ["plain", "smallest"]:
+        encoding = {column: name for column in TAGGED_COLUMNS}
+        page_file.write(path, orders, encoding=encoding, columns=TAGGED_COLUMNS)
+        with CountingFile(path) as f:
+            metadata = page_file.read_metadata(f)
+            columns = [
+                page_file.read_column(f, kind, metadata.pages[column])
+                for column, kind in metadata.codecs.items()
+            ]
+        assert list(zip(*columns, strict=True)) == orders

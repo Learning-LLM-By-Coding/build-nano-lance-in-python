@@ -8,7 +8,7 @@ in Python, one tested day at a time.
 This is the **public preview**: Days 0–5 — the file format, from rows and
 columns to random access — are free here, with every checkpoint tag. Days
 6–17 (tables and versions, indexes, the database layer) are the Pro
-edition. **Status: being written — Days 0 to 3 are done.**
+edition. **Status: being written — Days 0 to 4 are done.**
 
 ## Prerequisites
 
@@ -178,7 +178,7 @@ lives in the book's [introduction](book/src/introduction.md).
 | 1&nbsp;✅ | Rows vs columns | Store one table both ways, and count what a one-column question and a one-row fetch each have to read. | 2&nbsp;h |
 | 2&nbsp;✅ | A file of pages | Cut each column into pages, write a footer of where everything is, and read one column by jumping straight to it. | 2&nbsp;h |
 | 3&nbsp;✅ | Encodings | Store the same values in fewer bytes — dictionaries, runs, packed bits — and prove every value comes back. | 2&nbsp;h |
-| 4 | Strings, lists, and missing values | Values of different lengths, and values that are not there at all. | 2&nbsp;h |
+| 4&nbsp;✅ | Strings, lists, and missing values | Values of different lengths, and values that are not there at all. | 2&nbsp;h |
 | 5 | Random access | Fetch row 7,342 without reading the rest — and count how much less that reads than a Parquet-style layout. | 2&nbsp;h |
 | 6 | The table | Many files plus a record of each version: read the table as it was yesterday. | 2&nbsp;h |
 | 7 | Changing data | Append, delete without rewriting, update — and catch two writers colliding. | 2.5&nbsp;h |

@@ -32,6 +32,7 @@ introduced it, if you want the full explanation again.
 | 1 | [Crates or aisles](#day-1--crates-or-aisles) | the packing rule, crates, the tally, the stock count, aisles, a customer pickup |
 | 2 | [The wall card at the back](#day-2--the-wall-card-at-the-back) | sealed boxes, the box list, the wall card at the back, the stamp |
 | 3 | [The packer's bench](#day-3--the-packers-bench) | the packer and packing methods, the lid legend, stacks, snug compartments, the packing note, the weigh-in |
+| 4 | [Trays in the box](#day-4--trays-in-the-box) | trays, the letter strip and its end marks, bundles, the roll call |
 
 ## Day 1 — crates or aisles
 
@@ -240,5 +241,65 @@ turns around instead of misreading a box.
 *What it is:* for every page, encode with every encoding that accepts its values and store the smallest (`smallest`; a tie keeps plain). Each page of a column may choose differently. The cost is paid when writing: every page is encoded several times to keep one result. Real Lance chooses from cheap statistics instead, such as the number of runs.
 
 *In the story:* the packer packs each box every way at the bench, weighs each packing, keeps the lightest, and throws the rest away.
+
+</div>
+
+## Day 4 — trays in the box
+
+The warehouse's customer, a hardware shop, sends its orders as they
+really are, and they reach the packer's bench — where Day 1's
+[packing rule](#packing-rule) no longer fits: a name too long for
+its compartment, short names rattling in theirs, a bundle of tags on
+most orders, and prices nobody has quoted yet. So the packer stops
+cutting a box into equal compartments and puts **trays** in it instead —
+each tray holding equal compartments, with its own
+[packing note](#packing-note), so the lid legend, stacks, and snug
+compartments still work on every tray. Names go on **a letter strip**,
+every letter back to back, with **end marks** saying where each name
+ends; fetching one name now takes the picker two trips — the marks, then
+the letters. An order's tags are tied into a **bundle**: every tag on a
+letter strip of its own, and one more line of marks saying where each
+bundle ends. And a box with something missing gets **a roll call**: one
+answer per order, present or absent, while each missing one keeps an empty
+place in the other trays. The [stamp](#stamp) moves to edition 3, so a
+picker trained on edition 2 turns around.
+
+<div class="concept" id="trays">
+
+**Trays — several buffers in one page** · [Day 4, section B](day-04-strings-lists-nulls.md#section-b--the-letter-strip-and-its-end-marks-strings-in-trays)
+
+*What it is:* a page stored as several buffers back to back, each a run of fixed-width values with its own name, size, value count, and encoding (`Tray`, `Page.trays`), so Day 3's encodings pack every buffer unchanged. A page with a single buffer is stored exactly as on Day 3. Adding trays made the format version 3; the reader still reads versions 1 and 2. A Lance page lists its buffers the same way.
+
+*In the story:* trays inside a box, each holding equal compartments, with its own packing note.
+
+</div>
+
+<div class="concept" id="letter-strip">
+
+**The letter strip and its end marks — offsets and data** · [Day 4, section B](day-04-strings-lists-nulls.md#section-b--the-letter-strip-and-its-end-marks-strings-in-trays)
+
+*What it is:* a variable-length column stored as two buffers: *data*, every value's UTF-8 bytes back to back with no padding, and *offsets*, one more 4-byte offset than there are values — 0, then where each value ends. Value *k* is the data from offset *k* up to offset *k* + 1. Fetching one value takes two reads: its two offsets, then its bytes. This is Apache Arrow's variable-size binary layout.
+
+*In the story:* every name's letters written on one strip, and a line of marks saying where each name ends; one name costs two trips.
+
+</div>
+
+<div class="concept" id="bundles">
+
+**Bundles — list columns** · [Day 4, section C](day-04-strings-lists-nulls.md#section-c--bundles-lists-as-offsets-into-strings)
+
+*What it is:* a list column stored as *list offsets*, counted in items, into one child column of all the items — here a string column, so three buffers in all. An empty list is two equal offsets and takes no item bytes. This is Arrow's variable-size list layout.
+
+*In the story:* an order's tags tied into a bundle; every tag goes on a letter strip, and one more line of marks says where each order's bundle ends.
+
+</div>
+
+<div class="concept" id="roll-call">
+
+**The roll call — a validity bitmap** · [Day 4, section D](day-04-strings-lists-nulls.md#section-d--the-roll-call-missing-values-and-the-whole-table)
+
+*What it is:* one bit per value — 1 when present, 0 when missing (`None`) — with bit 0 in the lowest bit of the first byte, as in Arrow. A missing value keeps an empty place in the page's other buffers, which the bitmap hides. Only a page with a missing value has one, and it is always stored plain. Real Lance expresses the same facts with definition levels instead.
+
+*In the story:* one answer per order — present, or absent; a box with nothing missing has no roll call.
 
 </div>
