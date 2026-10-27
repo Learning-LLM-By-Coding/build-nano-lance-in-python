@@ -9,9 +9,10 @@ same plain bytes. The encodings never need to know what the values mean.
 
 import struct
 from collections.abc import Callable
+from itertools import groupby
 
 # A 4-byte count, stored inside a page: how many distinct values a
-# dictionary page holds.
+# dictionary page holds, or how long one run is.
 COUNT = struct.Struct("<I")
 # Dictionary codes are one byte each, so a dictionary holds at most 256 values.
 MAX_DICTIONARY = 256
@@ -62,6 +63,30 @@ def from_dictionary(codec: struct.Struct, raw: bytes, rows: int) -> bytes:
     return b"".join(legend[code] for code in raw[codes_start:])
 
 
+def run_length(codec: struct.Struct, data: bytes) -> bytes:
+    """Analogy: stacks — equal values side by side stacked together, one
+    value with a sticker saying how many.
+
+    Layout: for each run of equal values, the value at the column's width
+    followed by COUNT, the run's length.
+    """
+    runs = [
+        value + COUNT.pack(len(list(run))) for value, run in groupby(split(codec, data))
+    ]
+    return b"".join(runs)
+
+
+def from_run_length(codec: struct.Struct, raw: bytes, rows: int) -> bytes:
+    """Decode a run-length page: repeat every value as often as its run says."""
+    step = codec.size + COUNT.size
+    plain = []
+    for start in range(0, len(raw), step):
+        value = raw[start : start + codec.size]
+        (length,) = COUNT.unpack(raw[start + codec.size : start + step])
+        plain.append(value * length)
+    return b"".join(plain)
+
+
 Encoder = Callable[[struct.Struct, bytes], bytes]
 Decoder = Callable[[struct.Struct, bytes, int], bytes]
 
@@ -70,6 +95,7 @@ Decoder = Callable[[struct.Struct, bytes, int], bytes]
 ENCODINGS: dict[str, tuple[Encoder, Decoder]] = {
     "plain": (plain, from_plain),
     "dictionary": (dictionary, from_dictionary),
+    "run-length": (run_length, from_run_length),
 }
 
 

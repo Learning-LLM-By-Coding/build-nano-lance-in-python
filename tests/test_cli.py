@@ -155,10 +155,26 @@ def test_packing_packs_every_column_every_way(tmp_path):
     )
     assert lines[start : start + 7] == [
         "every column packed every way, orders as placed (bytes, all pages):",
-        "  id: plain 8000, dictionary 9040",
-        "  price: plain 8000, dictionary 1680",
-        "  qty: plain 4000, dictionary 1280",
-        "  name: plain 12000, dictionary 2000",
+        "  id: plain 8000, dictionary 9040, run-length 12000",
+        "  price: plain 8000, dictionary 1680, run-length 12000",
+        "  qty: plain 4000, dictionary 1280, run-length 8000",
+        "  name: plain 12000, dictionary 2000, run-length 16000",
         "write dictionary.bin: 15612 bytes, pages 12960 (plain: 32000)",
+        "  read back, told nothing: same as the table? True",
+    ]
+
+
+def test_packing_stacks_the_sorted_orders_in_runs(tmp_path):
+    lines = run_packing(tmp_path)
+    start = lines.index(
+        "every column packed every way, orders sorted by name (bytes, all pages):"
+    )
+    assert lines[start : start + 7] == [
+        "every column packed every way, orders sorted by name (bytes, all pages):",
+        "  id: plain 8000, dictionary 9040, run-length 12000",
+        "  price: plain 8000, dictionary 1168, run-length 192",
+        "  qty: plain 4000, dictionary 1100, run-length 120",
+        "  name: plain 12000, dictionary 1232, run-length 256",
+        "write sorted.bin: 11168 bytes, pages 8568 (plain: 32000)",
         "  read back, told nothing: same as the table? True",
     ]

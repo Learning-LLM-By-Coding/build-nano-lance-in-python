@@ -32,7 +32,7 @@ def test_every_encoding_gives_back_exactly_what_went_in(name, values):
     round_trip(name, "qty", values)
 
 
-@pytest.mark.parametrize("name", ["plain", "dictionary"])
+@pytest.mark.parametrize("name", ["plain", "dictionary", "run-length"])
 def test_text_and_floats_round_trip_too(name):
     orders = many_orders(100)
     round_trip(name, "name", [row[3] for row in orders])
@@ -58,3 +58,16 @@ def test_a_dictionary_holds_at_most_256_distinct_values():
     round_trip("dictionary", "qty", list(range(256)))
     with pytest.raises(ValueError, match="at most 256 values; this page has 257"):
         round_trip("dictionary", "qty", list(range(257)))
+
+
+def test_run_length_stores_each_run_once_with_its_length():
+    raw = round_trip("run-length", "qty", [5, 5, 5, 9, 5])
+    assert raw == b"".join(
+        pack_value("qty", value) + COUNT.pack(length)
+        for value, length in [(5, 3), (9, 1), (5, 1)]
+    )
+
+
+def test_run_length_without_runs_is_twice_as_large_as_plain():
+    qty = [row[2] for row in many_orders(100)]  # no two neighbors are equal
+    assert len(round_trip("run-length", "qty", qty)) == 100 * (4 + 4)  # plain: 400

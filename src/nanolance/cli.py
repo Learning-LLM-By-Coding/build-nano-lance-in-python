@@ -229,6 +229,10 @@ def packing(folder: Path) -> None:
     in_dictionaries = {"price": "dictionary", "qty": "dictionary", "name": "dictionary"}
     write_and_read_back(folder / "dictionary.bin", orders, in_dictionaries)
 
+    every_way("sorted by name", by_name)
+    in_runs = {"price": "run-length", "qty": "run-length", "name": "run-length"}
+    write_and_read_back(folder / "sorted.bin", by_name, in_runs)
+
 
 def main() -> int:
     """Run one demo by name; with no name, print the hello line."""
