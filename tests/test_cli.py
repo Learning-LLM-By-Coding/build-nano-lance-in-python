@@ -286,3 +286,36 @@ def test_shapes_stores_the_shop_table_with_its_missing_prices(tmp_path):
         "'nails', 'gloves', 'padlock', 'bolts', 'hammer', 'washers', 'tape']",
         "  tally: reads 3, bytes read 8770, seeks 3 (opening 7972, pages 798)",
     ]
+
+
+def run_take(folder):
+    result = subprocess.run(
+        [sys.executable, "-m", "nanolance", "take", str(folder)],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.splitlines()
+
+
+def test_take_by_scanning_reads_every_page_for_ten_rows(tmp_path):
+    lines = run_take(tmp_path)
+    assert lines[:15] == [
+        "write shop.bin: 10000 shop orders, 100 rows per page, 263487 bytes",
+        "open it once and keep the box lists — tally: "
+        "reads 2, bytes read 77910, seeks 2",
+        "the pick list, 10 row ids: "
+        "[7342, 15, 9999, 2718, 404, 6001, 8123, 3141, 0, 5050]",
+        "take by scanning every column:",
+        "  row 7342: (7443, None, 4, 'gloves', [])",
+        "  row 15: (116, 15.0, 2, 'padlock', ['gift', 'fragile'])",
+        "  row 9999: (10100, 15.0, 2, 'padlock', ['gift', 'fragile'])",
+        "  row 2718: (2819, None, 4, 'gloves', [])",
+        "  row 404: (505, 23.5, 1, 'drill bits Ø6', ['fragile'])",
+        "  row 6001: (6102, 12.5, 1, 'hammer', [])",
+        "  row 8123: (8224, 7.0, 2, 'tape', [])",
+        "  row 3141: (3242, 3.25, 12, 'nails', ['bulk'])",
+        "  row 0: (101, 4.25, 3, 'bolts', ['bulk'])",
+        "  row 5050: (5151, None, 40, 'washers', ['bulk', 'small parts'])",
+        "  tally: reads 500, bytes read 185577, seeks 500",
+    ]

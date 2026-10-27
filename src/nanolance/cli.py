@@ -463,6 +463,43 @@ def shapes(folder: Path) -> None:
     print(f"  tally: {tally}")
 
 
+# Analogy: a customer's pick list — ten orders, scattered across the warehouse.
+#
+# Ten row ids of a 10,000-row table: positions counted from 0 (row k holds the
+# order with id 101 + k), out of order, and rows 0 and 15 in the same page.
+PICK_LIST = [7342, 15, 9999, 2718, 404, 6001, 8123, 3141, 0, 5050]
+
+
+def take(folder: Path) -> None:
+    """Analogy: a customer hands the picker a pick list of ten orders.
+
+    Store 10,000 shop orders, read the file's metadata once, and fetch the
+    PICK_LIST rows, every column, counting what each way of fetching reads.
+    """
+    folder.mkdir(parents=True, exist_ok=True)
+    tagged = many_tagged_orders(10_000)
+    shop_path = folder / "shop.bin"
+    every_column = {column: "smallest" for column in TAGGED_COLUMNS}
+    page_file.write(shop_path, tagged, encoding=every_column, columns=TAGGED_COLUMNS)
+    size = shop_path.stat().st_size
+    print(
+        f"write {shop_path.name}: {len(tagged)} shop orders, "
+        f"{ROWS_PER_PAGE} rows per page, {size} bytes"
+    )
+    with CountingFile(shop_path) as f:
+        metadata = page_file.read_metadata(f)
+        print(f"open it once and keep the box lists — tally: {f.tally()}")
+    columns = list(metadata.codecs)
+    print(f"the pick list, {len(PICK_LIST)} row ids: {PICK_LIST}")
+
+    with CountingFile(shop_path) as f:
+        scanned = page_file.take_by_scan(f, metadata, PICK_LIST, columns)
+        print("take by scanning every column:")
+        for row_id, row in zip(PICK_LIST, scanned, strict=True):
+            print(f"  row {row_id}: {row}")
+        print(f"  tally: {f.tally()}")
+
+
 def main() -> int:
     """Run one demo by name; with no name, print the hello line."""
     parser = argparse.ArgumentParser(prog="nanolance")
@@ -475,6 +512,8 @@ def main() -> int:
     demo.add_argument("folder", type=Path, nargs="?", default=Path("warehouse"))
     demo = demos.add_parser("shapes", help="store values of any length, or none")
     demo.add_argument("folder", type=Path, nargs="?", default=Path("warehouse"))
+    demo = demos.add_parser("take", help="fetch scattered rows by their row ids")
+    demo.add_argument("folder", type=Path, nargs="?", default=Path("warehouse"))
     args = parser.parse_args()
 
     if args.demo == "layouts":
@@ -485,6 +524,8 @@ def main() -> int:
         packing(args.folder)
     elif args.demo == "shapes":
         shapes(args.folder)
+    elif args.demo == "take":
+        take(args.folder)
     else:
         print(f"nanolance {__version__}: scaffold is alive")
     return 0

@@ -17,6 +17,7 @@ uv run --locked nanolance layouts "$scratch"
 uv run --locked nanolance pages "$scratch"
 uv run --locked nanolance packing "$scratch"
 uv run --locked nanolance shapes "$scratch"
+uv run --locked nanolance take "$scratch"
 
 # The book must build: a sidebar entry whose chapter file is missing fails here.
 mdbook build book

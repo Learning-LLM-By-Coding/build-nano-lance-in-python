@@ -251,6 +251,29 @@ def read_rows(
     return values
 
 
+def check_row_ids(metadata: Metadata, row_ids: list[int]) -> None:
+    """Refuse any row id the file does not hold, negative ones included."""
+    for row_id in row_ids:
+        if not 0 <= row_id < metadata.rows:
+            raise IndexError(
+                f"row id {row_id}: the file holds rows 0 to {metadata.rows - 1}"
+            )
+
+
+def take_by_scan(
+    f: BinaryIO, metadata: Metadata, row_ids: list[int], columns: list[str]
+) -> list[tuple]:
+    """Analogy: a pick list, the slow way — carry back every box of every
+    aisle the list asks about, then pick the orders out at the bench.
+
+    The rows at `row_ids` (positions, from 0), in that order, each with the
+    `columns` asked for, in that order. Every asked-for column is read whole.
+    """
+    check_row_ids(metadata, row_ids)
+    values = {c: read_column(f, metadata.codecs[c], metadata.pages[c]) for c in columns}
+    return [tuple(values[c][row_id] for c in columns) for row_id in row_ids]
+
+
 def read_metadata(f: CountingFile) -> Metadata:
     """Analogy: walk to the back wall, read the wall card, then the box
     lists it points to.

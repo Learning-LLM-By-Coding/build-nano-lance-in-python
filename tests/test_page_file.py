@@ -276,3 +276,16 @@ def test_the_shop_table_round_trips_every_column_every_way(tmp_path):
                 for column, kind in metadata.codecs.items()
             ]
         assert list(zip(*columns, strict=True)) == orders
+
+
+def test_a_take_by_scanning_reads_every_page_of_every_column_asked(tmp_path):
+    path = tmp_path / "shop.bin"
+    tagged = many_tagged_orders(1000)
+    pages = page_file.write(path, tagged, columns=TAGGED_COLUMNS)
+    with CountingFile(path) as f:
+        metadata = page_file.read_metadata(f)
+    with CountingFile(path) as f:
+        rows = page_file.take_by_scan(f, metadata, [6, 2, 6], ["name", "price"])
+        assert rows == [("gloves", None), ("washers", None), ("gloves", None)]
+        every_page = pages["name"] + pages["price"]
+        assert (f.reads, f.bytes_read) == (20, sum(p.size for p in every_page))
