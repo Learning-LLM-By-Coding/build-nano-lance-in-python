@@ -11,6 +11,9 @@ uv run --locked ruff check
 uv run --locked pytest -q
 # The day's smoke command — update it whenever the CLI's shape changes.
 uv run --locked nanolance
+scratch=$(mktemp -d)
+trap 'rm -rf "$scratch"' EXIT
+uv run --locked nanolance layouts "$scratch"
 
 # The book must build: a sidebar entry whose chapter file is missing fails here.
 mdbook build book

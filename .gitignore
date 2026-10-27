@@ -7,4 +7,7 @@ __pycache__/
 # mdBook build output (book/book is generated from book/src)
 /book/book
 
+# Files the demos write (`uv run nanolance layouts` and later days)
+/warehouse
+
 .DS_Store
