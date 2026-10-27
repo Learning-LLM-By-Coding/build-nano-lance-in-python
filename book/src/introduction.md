@@ -49,11 +49,13 @@ caveated number.
 
 ## Real Lance is the referee
 
-From Part 1 on, tests run your code and the real `pylance` and `lancedb`
-packages on the same data, and the results must match: the same rows from
-a scan, a filter, or a fetch by row id, the same table at the same
-version. Vector search is judged differently — by *recall*, the share of
-the true nearest neighbors your index finds. One honest limit: your files
+The finale, Day 17, runs a small search app on your code and on the real
+`lancedb` package, on the same data, and compares the results. Before
+that, every day is its own referee: tests check each result against the
+data that went in — the same rows back from a scan, a fetch by row id, or
+an old version of the table — and every cost is counted. Vector search is
+judged by *recall*, the share of the true nearest neighbors your index
+finds. One honest limit: your files
 will not be readable by real Lance. The course rebuilds Lance's ideas, not
 its exact bytes.
 
@@ -111,7 +113,7 @@ book is written.
 | 4 | Strings, lists, and missing values | What fixed widths cannot say · strings as offsets and data, in trays · lists as offsets into strings · validity bitmaps — bytes saved, one value in two reads | 2 h |
 | 5 | Random access | A take by scanning · row id → page · a Parquet-style row-group layout · page size: scan vs take — bytes and reads counted | 2 h |
 | 6 | The table | Fragments · a manifest per version · time travel | 2 h |
-| 7 | Changing data | Appends · deletion files · updates · optimistic commits & conflict detection | 2.5 h |
+| 7 | Changing data | Delete without rewriting (deletion files) · updates · catch two writers colliding (optimistic commits) | 2.5 h |
 | 8 | Schema evolution | Add a column without rewriting · drop a column | 1.5 h |
 | 9 | Compaction and cleanup | Compaction · cleaning up old versions | 2 h |
 | **Part 2** | **Indexes** | | |

@@ -137,10 +137,11 @@ One small format and one small database, built in three parts:
   BM25, hybrid search, and a tiny built-in embedder — ending in a small
   semantic-search app.
 
-**The referee is real.** From Part 1 on, a test compares your results with
-the real `pylance` and `lancedb` packages on the same data: scans, filters,
-takes, and versions must match exactly; vector search is judged by recall
-against exact brute force. One honest limit: your files will *not* be
+**The referee is real — at the finale.** Day 17 runs a small
+semantic-search app on your code and on the real `lancedb` package, on the
+same data, and compares the results. Before that, every day is its own
+referee: tests check each result against the data that went in, and every
+cost is counted. One honest limit: your files will *not* be
 readable by real Lance — the course rebuilds the ideas, not its exact byte
 format.
 
@@ -181,7 +182,7 @@ lives in the book's [introduction](book/src/introduction.md).
 | 4&nbsp;✅ | Strings, lists, and missing values | Values of different lengths, and values that are not there at all. | 2&nbsp;h |
 | 5&nbsp;✅ | Random access | Fetch row 7,342 without reading the rest — and count how much less that reads than a Parquet-style layout. | 2&nbsp;h |
 | 6&nbsp;✅&#8288;🔒 | The table | Many files plus a record of each version: read the table as it was yesterday. | 2&nbsp;h |
-| 7&nbsp;🔒 | Changing data | Append, delete without rewriting, update — and catch two writers colliding. | 2.5&nbsp;h |
+| 7&nbsp;🔒 | Changing data | Delete without rewriting, update — and catch two writers colliding. | 2.5&nbsp;h |
 | 8&nbsp;🔒 | Schema evolution | Add a column to a big table without rewriting it; drop one. | 1.5&nbsp;h |
 | 9&nbsp;🔒 | Compaction and cleanup | Merge many small files into a few, and delete versions nobody needs. | 2&nbsp;h |
 | 10&nbsp;🔒 | Scalar indexes | A sorted index and a bitmap index let filters skip most of the table. | 2&nbsp;h |
@@ -253,7 +254,7 @@ code is copied from either project; the course rebuilds the ideas.
 
 - [Lance](https://github.com/lance-format/lance) and its
   [format documentation](https://lance.org/format/) (Apache-2.0) — the
-  format this course rebuilds in miniature, and the referee for Part 1.
+  format this course rebuilds in miniature.
 
 - [LanceDB](https://github.com/lancedb/lancedb) and its
   [docs](https://docs.lancedb.com/) (Apache-2.0) — the database Part 3
