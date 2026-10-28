@@ -8,7 +8,9 @@ in Python, one tested day at a time.
 This is the **public preview**: Days 0–5 — the file format, from rows and
 columns to random access — are free here, with every checkpoint tag. Days
 6–17 (tables and versions, indexes, the database layer) are the Pro
-edition. **Status: the free preview is complete — Days 0 to 5 are done.**
+edition. **Status: all 18 days are written — Days 0–5 are free here, and
+Days 6–17 are finished in the Pro edition** (launching soon — star or
+watch this repository to catch it).
 
 ## Prerequisites
 
@@ -198,7 +200,6 @@ lives in the book's [introduction](book/src/introduction.md).
 
 ✅&#8288;🔒 = finished, in the Pro edition (launching soon — star or watch this repository to catch it).
 
-🔒 = Pro edition, still being written.
 
 ## How to follow the course
 
