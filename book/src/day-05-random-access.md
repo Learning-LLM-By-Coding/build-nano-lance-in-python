@@ -44,10 +44,10 @@ point — nothing says a "day" must fit in one. Still **no dependencies**.
 ## 1. What you will have running
 
 By the end of today, `uv run nanolance take` stores 10,000 of the shop's
-orders and fetches ten of them, scattered all over the table, by their
-row numbers: row 7342, row 15, row 9999, and seven more. Fetching rows
-by number is what Lance calls a **take**. The demo does it three ways,
-and counts every read:
+orders. Then it fetches ten of them by their row numbers, scattered all
+over the table: row 7342, row 15, row 9999, and seven more. Fetching
+rows by number is what Lance calls a **take**. Your demo does it three
+ways, and counts every read:
 
 - by **scanning**: reading every value of every column, then picking
   out the ten rows;
@@ -59,8 +59,8 @@ and counts every read:
   blocks that must be read whole.
 
 Last, it writes the same table with pages of 10, 100, 2,500, and 10,000
-rows, and prints one table: what a full scan and the ten-row take each
-read from every one. Small pages make the take read few bytes; big pages
+rows. Then it prints one table of what a full scan and the ten-row take
+each read from every file. Small pages make the take read few bytes; big pages
 let the scan finish in few reads. You will see both, in bytes and reads.
 
 <div class="dl-concepts"><span>Lance concepts used here:</span>
@@ -98,26 +98,26 @@ box size: what a scan and the pick list read, every column (reads, bytes)
 - `the pick list, 10 row ids: …` — the ten rows to fetch. A row's number
   is its position in the table, counting from 0.
 
-- The first `tally` line — fetching those ten rows by scanning: 500
-  reads and 185,577 bytes, every byte of every column.
+- The first `tally` line — fetching those ten rows by scanning costs
+  500 reads and 185,577 bytes: every byte of every column.
 
-- `take box by box` and its tally — the same ten rows from only the
-  pages that hold them: 45 reads, 16,672 bytes, about an eleventh.
+- `take box by box` and its tally — the same ten rows, read from only
+  the pages that hold them: 45 reads and 16,672 bytes, about an eleventh.
 
-- `take from the row groups` and its tally — the Parquet-style file:
-  fewer reads, but more bytes than even the scan.
+- `take from the row groups` and its tally — the Parquet-style file
+  needs fewer reads, but more bytes than even the scan.
 
-- The table — five ways to store the same table. The first number in
-  each row is the size of the file's map of its pages; then the scan,
-  and the ten-row take, as reads and bytes. Read the last two columns
+- The table — five ways to store the same orders. The first number in
+  each row is the size of the file's map of its pages. Then come the
+  scan and the ten-row take, each as reads and bytes. Read the last two columns
   side by side: as the pages grow, the scan needs fewer reads
   and the take needs more bytes.
 
 ## 3. Why we need it
 
-Since Day 2, the reader answers two kinds of question: a **scan** —
-every value of a column — and a **stretch** of neighboring rows, such as
-rows 10 to 19. Real programs often ask a third kind:
+Since Day 2, your reader answers two kinds of question. A **scan** asks
+for every value of a column. A **stretch** asks for neighboring rows,
+such as rows 10 to 19. Real programs often ask a third kind:
 
 - **A training job** shuffles its table every pass and asks for a batch
   of rows in random order — row 7342, then row 15, then row 9999.
@@ -134,12 +134,13 @@ operations", and: "This is important for selective filters, point
 lookups, vector-search follow-up reads, and ML training workloads that
 sample rows non-sequentially."
 
-Yesterday's code has no way to ask for a list of rows. The simplest way
-to get one is to scan and pick — and section A counts what that costs.
+Your code from yesterday has no way to ask for a list of rows. The
+plainest way to get one is to scan and pick, and section A counts what
+that costs.
 
 On Day 1 you saw that one row costs a stop in every column. Today you
-count what a *list* of rows costs, and compare it with the other famous
-columnar format, Parquet, which groups rows into large blocks first.
+count what a *list* of rows costs. Then you compare it with the other
+famous columnar format, Parquet, which first groups rows into large blocks.
 
 **The story so far — remember [the warehouse](story.md):** orders in
 [aisles](story.md#column-layout), cut into [sealed boxes](story.md#pages),
@@ -147,22 +148,23 @@ found by [box lists](story.md#box-list), every trip
 [tallied](story.md#tally).
 
 Today's scene is **the pick list**. On Day 1, a
-[customer pickup](story.md#pickup) was one whole order; now a customer
+[customer pickup](story.md#pickup) was one whole order. Now a customer
 hands the picker a list of ten orders, scattered across a warehouse of
-10,000, and the picker learns to walk straight to the right box for each
-one. Across the street stands a second warehouse, built the Parquet way:
-it ships its orders on **pallets** — a few thousand whole orders each,
-every aisle's share wrapped as one piece — and today the picker fills
-the same list there.
+10,000. The picker learns to walk straight to the right box for each one.
+Across the street stands a second warehouse, built the Parquet way. It
+ships its orders on **pallets**: a few thousand whole orders each, with
+every aisle's share wrapped as one piece. Today the picker fills the
+same list there too.
 
 ## 4. Mental model
 
 Walk the picker's route, one stop per section:
 
 - **[The pick list](story.md#pick-list) (section A)** — ten row numbers.
-  A row's number is its place in the table, from 0 — not the order's
-  `id`, which starts at 101. The slow way to fill the list: carry back
-  every box of every aisle, then pick the ten orders out at the bench.
+  A row's number is its place in the table, from 0. It is not the
+  order's `id`, which starts at 101. The slow way to fill the list is to
+  carry back every box of every aisle, then pick the ten orders out at
+  the bench.
 
 - **[Start numbers](story.md#start-numbers) (section B)** — which box
   holds row 7342? The box list already says how many rows each box
@@ -183,13 +185,13 @@ Walk the picker's route, one stop per section:
   from it, then hands the rows over in the order the list asked.
 
 - **[Pallets](story.md#pallets) (section C)** — the warehouse across the
-  street. A pallet carries 2,500 whole orders, and on it each aisle's
-  share is wrapped as one piece: to get one price, the picker unwraps
+  street. A pallet carries 2,500 whole orders, and each aisle's share
+  on it is wrapped as one piece. To get one price, the picker unwraps
   all 2,500 prices. That is Parquet's *row group*, in miniature.
 
 - **[The box size](story.md#box-size) (section D)** — small boxes let a
   pick list carry few bytes, but a stock count must make many trips to
-  carry them all; big boxes let the stock count finish in a few trips,
+  carry them all. Big boxes let the stock count finish in a few trips,
   but a pick list carries far more. Section D counts both.
 
 Here is the whole take of section B, as data flowing down the page:
@@ -216,15 +218,15 @@ unchanged.
 
 ## 5. Lance concepts introduced
 
-- **A take.** Fetching rows by their positions, in a given order. It
-  is the question behind Lance's "Random-Access-Friendly Encoding" design
+- **A take.** A take fetches rows by their positions, in a given order.
+  It is the question behind Lance's "Random-Access-Friendly Encoding" design
   goal (§3).
 
 - **Read the metadata once, keep it.** "Random access requires that we
   locate the physical location of the data in the file," and Lance's
   reader keeps what it needs for that — page locations, encodings — in
   a *search cache*: "The cost of initialization is assumed to be
-  amortized over the lifetime of the reader." Today's demo does the
+  amortized over the lifetime of the reader." Your demo does the
   same: it opens a file once, keeps the box lists, and counts each take
   without them.
 
@@ -260,7 +262,7 @@ with numbers.
 1. **Real Parquet cuts each column chunk into pages.** Today's pallets
    store each chunk as one unit — Parquet's worst case for a take. Real
    writers cut chunks into data pages (the documentation recommends
-   "8KB for page sizes"), and an optional *page index* says where each
+   "8KB for page sizes"). An optional *page index* then says where each
    page sits: its OffsetIndex "allows navigation by row index". Without
    it, "a reader had to process the page header to determine whether the
    page could be skipped", which "means the reader had to access all
@@ -293,7 +295,7 @@ with numbers.
 <a href="https://docs.python.org/3.12/reference/lexical_analysis.html#integer-literals"><code>10_000</code>: underscores group a number's digits; it is 10000</a>
 </div>
 
-First, the question itself, asked the obvious way. In
+First, ask the question itself the most direct way. In
 `src/nanolance/page_file.py`, between the end of `read_rows` (its
 `return values`, line 251) and `def read_metadata` (around line 253):
 
@@ -333,13 +335,12 @@ def take_by_scan(
   Day 2's `read_column`, then picks the asked rows out, in the list's
   order. A `row_id` can repeat; it is only an index.
 
-- Both take the file's `Metadata`, already read. The picker reads the
+- Both functions take the file's `Metadata`, which you already read. The picker reads the
   wall card and the box lists once, and keeps them in hand for every
   question that follows.
 
-Now the demo. The demo function is named `take`, after its subcommand.
-Section B adds `page_file.take`, a different function the demo will
-call. In `src/nanolance/cli.py`, two edits:
+Now the demo, a function named `take` after its subcommand. Section B
+adds `page_file.take`, a different function that this demo will call. In `src/nanolance/cli.py`, two edits:
 
 1. Between the end of `shapes` and `def main` (around line 466), the
    pick list and the demo:
@@ -456,18 +457,17 @@ Read it line by line:
   first row (0) to the last (9999).
 
 - The ten `row …` lines — each order, every column, from
-  `take_by_scan`. Row 7342 is the order with id 7443; its price is
-  `None`, because Day 4's [roll call](story.md#roll-call) came along;
-  its name and its empty tags list came from their trays.
+  `take_by_scan`. Row 7342 is the order with id 7443. Its price is
+  `None`, because Day 4's [roll call](story.md#roll-call) came along,
+  and its name and empty tags list came from their trays.
 
 - `tally: reads 500, bytes read 185577, seeks 500` — five aisles of 100
   boxes: every box in the warehouse, 185,577 bytes, for ten orders.
 
-That is the felt problem: a list of ten rows cost exactly as much as
-reading the whole table. And on cloud storage, each of those 500 reads
-is a separate request.
+So your list of ten rows cost exactly as much as reading the whole
+table. On cloud storage, each of those 500 reads is a separate request.
 
-Pin it with two tests — one edit in each file, made by one checkout:
+Pin it with two tests. One checkout makes both edits, one per file:
 
 ```bash
 git checkout v1-day-05a -- tests/test_page_file.py tests/test_cli.py
@@ -522,10 +522,10 @@ A hundred and twenty-six tests: yesterday's 124 and the two new ones.
 <a href="https://docs.python.org/3.12/tutorial/datastructures.html#sets">set comprehensions: <code>{f(x) for x in …}</code> builds a set, each value once</a>
 </div>
 
-The box list already knows how many rows each box holds — Day 2's
+The box list already knows how many rows each box holds. Day 2's
 `read_rows` used those counts to skip boxes outside one stretch of rows.
-A pick list needs the same idea for every row on it, in any order. Three
-new functions in `src/nanolance/page_file.py`:
+A pick list needs the same idea for every row on it, in any order. Add
+three new functions to `src/nanolance/page_file.py`:
 
 1. Below `import struct` (line 11), the binary search from Python's
    standard library:
@@ -598,15 +598,15 @@ new functions in `src/nanolance/page_file.py`:
   boxes work too; the last box of a table often holds fewer rows.
 
 - **`locate`** finds a row's box: `bisect_right(starts, row_id)` counts
-  the starts at or below the row, so one less is the last of them — the
-  box. Row 7342: 74 starts (0 to 7300) are at or below it, so box 73,
+  the starts at or below the row. One less than that count is the last
+  of those starts: the box. Row 7342: 74 starts (0 to 7300) are at or below it, so box 73,
   place 7342 − 7300 = 42.
 
 - **`take`** walks the pick list once per column. `opened` remembers the
   values of every box already carried back, so a box two rows share is
   read once. Each value goes into `values` in the list's order, so
-  repeats and any order come out right. Each box is unpacked by
-  `read_page` on its own: a box packed with the
+  repeats and any order come out right. `read_page` unpacks each
+  box on its own, so a box packed with the
   [lid legend](story.md#lid-legend) needs only its own lid.
 
 Now the demo, at the end of `take` in `src/nanolance/cli.py` (around
@@ -683,7 +683,7 @@ Read the new lines one by one:
   185,577 — about an eleventh.
 
 Calling Day 2's `read_rows` once per row would have found the right
-boxes too, but carried box 0 back twice: 50 reads, 18,459 bytes. Remembering opened
+boxes too, but it would carry box 0 back twice: 50 reads, 18,459 bytes. Remembering opened
 boxes is what turns ten fetches into one take.
 
 Pin it with tests — four edits in two files, all made by one checkout:
@@ -735,9 +735,9 @@ git checkout v1-day-05b -- tests/test_page_file.py tests/test_cli.py
        ]
    ```
 
-3. Below that, two tests of exact counts: rows 999, 0, 5, 100, 99, and 5
-   cost three reads — boxes 9, 0, and 1 — and an empty list costs
-   nothing; and row −1 or 1000 is refused before any read.
+3. Below that, two tests of exact counts. Rows 999, 0, 5, 100, 99, and
+   5 cost three reads (boxes 9, 0, and 1), and an empty list costs
+   nothing. Row −1 or 1000 is refused before any read.
 
 4. At the bottom of `tests/test_cli.py`,
    `test_take_box_by_box_reads_only_the_boxes_on_the_list` pins the six
@@ -764,12 +764,12 @@ pick-list test, four more for the page file, and one for the demo.
 
 Section C needs no new Python.
 
-Now the warehouse across the street. A Parquet file stores its rows in
+Now cross the street to the second warehouse. A Parquet file stores its rows in
 **row groups**: the first few thousand rows, then the next few thousand.
 Inside a group, each column's values form one **column chunk**, stored
 one after another — every column of group 0, then every column of group
-1. Here, each chunk is packed as one unit, so one value costs the whole
-chunk.
+1. In your version, each chunk is packed as one unit, so one value
+costs the whole chunk.
 
 First, a small move, so both files can share their ending. In
 `src/nanolance/page_file.py`, two edits:
@@ -887,7 +887,7 @@ def write(
 - **The same box lists.** `finish` writes each column's chunks as its
   pages, so the page file's reader reads a pallet file unchanged —
   `read_metadata`, `take`, and all. Parquet's own footer lists the row
-  groups first, then their chunks; ours lists the same facts the other
+  groups first, then their chunks. Yours lists the same facts the other
   way round.
 
 Now the demo. In `src/nanolance/cli.py`, two edits:
@@ -962,8 +962,8 @@ take from the row groups: the same rows? True
 
 Read it line by line:
 
-- `write groups.bin: 4 row groups of 2500 orders, 200201 bytes` —
-  `row_groups.write`: four pallets.
+- `write groups.bin: 4 row groups of 2500 orders, 200201 bytes` — four
+  pallets, from `row_groups.write`.
 
 - `group 0: id 0, price 3751, …` and `group 1: id 48855, …` — the swapped
   loops, in offsets: group 0's five chunks, then group 1's.
@@ -978,11 +978,11 @@ Read it line by line:
   same answer.
 
 - `tally: reads 20, bytes read 196701, seeks 20` — four groups times
-  five columns: fewer trips than section B's 45, but 196,701 bytes: every
-  chunk in the file, about twelve times section B's 16,672.
+  five columns. That is fewer trips than section B's 45, but 196,701
+  bytes is every chunk in the file, about twelve times section B's 16,672.
 
-That is even more than the scan of `shop.bin` (185,577), because bigger
-units pack differently.
+Those bytes are even more than the scan of `shop.bin` (185,577), because
+bigger units pack differently.
 
 <details>
 <summary>Why more bytes than the scan? (click to open)</summary>
@@ -1052,7 +1052,7 @@ for the demo.
 </div>
 
 Sections B and C differ in one thing: the size of the unit a take must
-carry whole — 100 rows, or 2,500. So try every size. In
+carry whole, 100 rows or 2,500. So try every size. In
 `src/nanolance/cli.py`, two edits:
 
 1. Between the end of `shapes` and the `# Analogy: a customer's pick
@@ -1105,8 +1105,8 @@ carry whole — 100 rows, or 2,500. So try every size. In
        # ──────── new code ends here ────────
    ```
 
-`costs` opens a file once for its box lists, then counts two questions
-with them in hand: a scan of every column, with `read_column`, and the
+`costs` opens a file once for its box lists. Then it counts two
+questions with them in hand: a scan of every column, with `read_column`, and the
 pick list, with `take`. The demo writes the same table with four
 [box sizes](story.md#box-size), then adds `groups.bin` as a last row.
 Run it:
@@ -1152,7 +1152,7 @@ The last two rows hold the day's main result. **For a take, the order on
 disk did not matter; the size of the unit read whole did.** A pallet is
 a 2,500-row box — and so is any big box. Row groups still shape other
 things a byte count cannot show here, such as how much memory a writer
-needs, which is one of Lance's reasons to drop them (§5). Real Lance
+needs. That memory is one of Lance's reasons to drop them (§5). Real Lance
 keeps big pages yet escapes this cost by reading one small mini-block
 inside them ([§5](#5-lance-concepts-introduced), item 2 of the "Be fair"
 callout).
@@ -1192,8 +1192,8 @@ git checkout v1-day-05d -- tests/test_page_file.py tests/test_cli.py
    ```
 
 2. In `tests/test_cli.py`, section C's test compared everything from
-   `write groups.bin` to the end of the output; now the table follows,
-   so it pins its seven lines only: `lines[start:]` becomes
+   `write groups.bin` to the end of the output. Now the table follows,
+   so the test pins its own seven lines only: `lines[start:]` becomes
    `lines[start : start + 7]`.
 
 3. At the bottom of `tests/test_cli.py`,
@@ -1347,7 +1347,7 @@ The demo shows where the −1 goes:
 uv run nanolance take
 ```
 
-Section A's fifteen lines print unchanged; then the new code stops
+Section A's fifteen lines print unchanged. Then the new code stops
 with an error:
 
 ```text
@@ -1379,8 +1379,8 @@ Traceback (most recent call last):
 IndexError: list index out of range
 ```
 
-Box `-1` sits in the list of boxes, and Python reads `pages[-1]` as *the
-last box*: the picker walks to box 99 for row 0. Only the place, −9900,
+Box `-1` now sits in the list of boxes. Python reads `pages[-1]` as *the
+last box*, so the picker walks to box 99 for row 0. Only the place, −9900,
 is too far for any box to hold, and that is where the error comes from.
 With one box per aisle, the place would be 0, `pages[-1]` would be the
 only box, and the wrong code would give the right answer. **A row that
@@ -1428,7 +1428,7 @@ including `nanolance take` — and the book build all pass.
 
 The smoke gate gained one line today: `uv run --locked nanolance take
 "$scratch"`. `scripts/check.sh` is course infrastructure, outside what
-`compare.sh` checks; to pick up today's copy, take it from the
+`compare.sh` checks. To pick up today's copy, take it from the
 checkpoint:
 
 ```bash
@@ -1516,7 +1516,7 @@ hand, every cost in it counted. If you would like to keep going — a
 table of many files that remembers every version, indexes that let
 filters and vector searches read less, and a small LanceDB-style
 database — that is the Pro edition. The Pro edition is still being
-written; star or watch the repository to hear when it launches — the
+written. Star or watch the repository to hear when it launches; the
 README will say. Either way, thank you for building this far.
 
 **What the Pro edition does next (Day 6):** everything still lives in
