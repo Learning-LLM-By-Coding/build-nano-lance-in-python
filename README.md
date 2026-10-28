@@ -184,7 +184,7 @@ lives in the book's [introduction](book/src/introduction.md).
 | 6&nbsp;✅&#8288;🔒 | The table | Many files plus a record of each version: read the table as it was yesterday. | 2&nbsp;h |
 | 7&nbsp;✅&#8288;🔒 | Changing data | Delete without rewriting, update — and catch two writers colliding. | 2.5&nbsp;h |
 | 8&nbsp;✅&#8288;🔒 | Schema evolution | Add a column to a big table without rewriting it; drop one. | 2.5&nbsp;h |
-| 9&nbsp;🔒 | Compaction and cleanup | Merge many small files into a few, and delete versions nobody needs. | 2&nbsp;h |
+| 9&nbsp;✅&#8288;🔒 | Compaction and cleanup | Merge many small files into a few, and delete versions nobody needs. | 2.5&nbsp;h |
 | 10&nbsp;🔒 | Scalar indexes | A sorted index and a bitmap index let filters skip most of the table. | 2&nbsp;h |
 | 11&nbsp;🔒 | Vector search | Find the nearest vectors: check every one, then only the few closest clusters — and measure what that costs in recall. | 2.5&nbsp;h |
 | 12&nbsp;🔒 | Product quantization | Store each vector as a few short codes: far less memory, a little less recall, and a refine step to win it back. | 2.5&nbsp;h |
