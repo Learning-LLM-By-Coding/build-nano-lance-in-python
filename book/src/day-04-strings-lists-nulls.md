@@ -43,10 +43,10 @@ point — nothing says a "day" must fit in one. Still **no dependencies**.
 ## 1. What you will have running
 
 By the end of today, `uv run nanolance shapes` stores the orders the way
-a shop really sends them: names of **any length** — one with a two-byte
-`Ø` in it — a **list of tags** on each order, some empty, and **prices
-nobody has quoted yet** — and every value comes back exactly, counted
-in bytes and reads along the way.
+a shop really sends them. Names have **any length**, and one has a
+two-byte `Ø` in it. Each order carries a **list of tags**, some empty.
+And some **prices nobody has quoted yet**. Every value comes back
+exactly, counted in bytes and reads along the way.
 
 <div class="dl-concepts"><span>Lance concepts used here:</span>
 <a href="https://arrow.apache.org/docs/format/Columnar.html#variable-size-binary-layout">Arrow's variable-size binary layout: an offsets buffer and a data buffer ↗</a>
@@ -59,8 +59,8 @@ in bytes and reads along the way.
 
 ## 2. What you will be seeing in the output
 
-A few lines from the end of the day (section 8 has all of them); if one
-doesn't land yet, that's fine:
+Here are a few lines from the end of the day (section 8 has all of
+them). If one doesn't land yet, that's fine:
 
 ```text
 names of Day 3's 1000 orders, in 12-byte slots: 12000 bytes, 6250 of them letters, 5750 padding
@@ -76,29 +76,29 @@ average price from shop.bin = 10.92, 250 missing
   tally: reads 12, bytes read 9702, seeks 12 (opening 7972, pages 1730)
 ```
 
-- The first two lines — yesterday's names, each in a fixed 12 bytes:
-  almost half of those bytes are padding, and a 14-byte name does not
+- The first two lines — yesterday's names, each in a fixed 12 bytes.
+  Almost half of those bytes are padding, and a 14-byte name does not
   fit at all.
 
-- `strings.bin: …` — the same names with no padding: the letters back to
-  back, plus numbers saying where each name ends.
+- `strings.bin: …` — the same names with no padding. The letters sit back
+  to back, plus numbers saying where each name ends.
 
-- `one name, row 4` and the two lines under it — the price: one read
-  from fixed slots, two from back-to-back letters.
+- `one name, row 4` and the two lines under it — the price of fetching
+  one name: one read from fixed slots, two from back-to-back letters.
 
 - `average price … 250 missing` — the table now *says* when a price is
   unknown, so an average leaves it out instead of counting it as zero.
 
 ## 3. Why we need it
 
-Since Day 1, every value has had a fixed width: that is what made
+Since Day 1, every value has had a fixed width, and that is what made
 "where is value *k*?" plain arithmetic. But a real shop's orders do not
 fit fixed widths. Three things go wrong:
 
 - **Names have any length.** A name slot is 12 bytes. Day 1 refused
-  `screwdriver set` (15 bytes), and today's orders include `drill bits Ø6`:
-  13 characters, but 14 bytes, because `Ø` takes two bytes in UTF-8.
-  Making the slot wider only makes it worse for everyone else: the
+  `screwdriver set` (15 bytes), and today's orders include `drill bits Ø6`.
+  That name is 13 characters, but 14 bytes, because `Ø` takes two bytes
+  in UTF-8. A wider slot only makes things worse for everyone else. The
   thousand names of Day 3 already spend 5750 of their 12000 bytes on
   padding.
 
@@ -106,11 +106,12 @@ fit fixed widths. Three things go wrong:
   fixed width fits "any number of words, each of any length".
 
 - **Some values are missing.** A price nobody has quoted yet has no bytes
-  that say so: every 8-byte pattern is some float. Storing 0.0 instead
-  is a lie the rest of the code believes — the cheapest order becomes
-  `gloves at 0.0`, and the average price drops from 10.92 to 8.19.
+  that say so, because every 8-byte pattern is some float. Storing 0.0
+  instead is a lie the rest of the code believes. The cheapest order
+  becomes `gloves at 0.0`, and the average price drops from 10.92 to
+  8.19.
 
-Day 3 changed how values are packed; today changes what a page can
+Day 3 changed how values are packed. Today changes what a page can
 hold.
 
 **The story so far — remember [the warehouse](story.md):** the orders
@@ -118,12 +119,12 @@ sit in [aisles](story.md#column-layout) cut into
 [sealed boxes](story.md#pages); [box lists](story.md#box-list) and
 [the wall card](story.md#wall-card) at the back tell a picker who knows
 nothing where every box is, and [the tally](story.md#tally) counts every
-trip; yesterday [the packer](story.md#encodings) learned to pack each
+trip. Yesterday [the packer](story.md#encodings) learned to pack each
 box tighter. Today's scene is **trays in the box**. The warehouse's
-customer, a hardware shop, sends its orders as they really are, and at
-the packer's bench they do not fit Day 1's
+customer, a hardware shop, sends its orders as they really are. At the
+packer's bench, they do not fit Day 1's
 [packing rule](story.md#packing-rule) of fixed-size compartments. So the
-packer puts **trays** in the box instead — a tray of letters, a tray of
+packer puts **trays** in the box instead: a tray of letters, a tray of
 marks saying where each name ends, and a tray of answers saying which
 values are present at all.
 
@@ -131,12 +132,13 @@ values are present at all.
 
 Walk the packer's bench, one station per section:
 
-- **What does not fit (section A)** — counted, not guessed.
+- **What does not fit (section A)** — the packer counts it, instead of
+  guessing.
 
 - **[The letter strip and its end marks](story.md#letter-strip)
-  (section B)** — offsets and data. All the names' letters written back
-  to back on one strip, no padding, and beside it a line of marks: where
-  each name ends. Here are four names:
+  (section B)** — offsets and data. All the names' letters go back to
+  back on one strip, with no padding. Beside it runs a line of marks
+  saying where each name ends. Here are four names:
 
   ```text
   the names       bolts, hammer, washers, tape
@@ -144,34 +146,35 @@ Walk the packer's bench, one station per section:
   end marks       0, 5, 11, 18, 22           where each name ends; the first is always 0
   ```
 
-  Five marks for four names: name *k* is the strip from mark *k* up to
+  Four names need five marks. Name *k* is the strip from mark *k* up to
   mark *k* + 1, so name 2 (counting from 0, as Python does) runs from 11
-  to 18 — `washers`.
+  to 18: `washers`.
 
 - **[Trays](story.md#trays) (section B)** — several buffers in one page.
-  A *buffer* is one run of bytes that a page stores in one piece; until
+  A *buffer* is one run of bytes that a page stores in one piece. Until
   today, every page was a single buffer. Now a box holds two trays back
   to back, the marks and the letters. Each tray is a run of fixed-width
-  values — 4-byte marks, 1-byte letters. So each tray gets its own
+  values: 4-byte marks, 1-byte letters. So each tray gets its own
   packing note, and Day 3's packing methods work on it unchanged.
 
-- **Edition 3 (section B).** A box that needs one tray is packed as
-  yesterday, but trays change what a file can mean, so the stamp moves
-  to edition 3.
+- **Edition 3 (section B).** A box that needs one tray is packed as it
+  was yesterday. But trays change what a file can mean, so the stamp
+  moves to edition 3.
 
 - **One name, two trips (section B).** In fixed slots, name *k* sits at
-  12 × *k*: one trip. On a letter strip, its two end marks come first.
+  12 × *k*, so one trip finds it. On a letter strip, the picker fetches
+  its two end marks first.
 
 - **[Bundles](story.md#bundles) (section C)** — lists. Every tag of
-  every bundle goes on a letter strip with its own end marks, and one
-  more line of marks says where each order's bundle ends, counted in
-  tags. An empty bundle is two equal marks.
+  every bundle goes on a letter strip with its own end marks. One more
+  line of marks says where each order's bundle ends, counted in tags. An
+  empty bundle is two equal marks.
 
 - **[The roll call](story.md#roll-call) (section D)** — a validity
-  bitmap: one answer per value, 1 for present, 0 for absent, eight to a
-  byte. A missing value keeps its place in the other trays as an empty
-  one, which the roll call hides. A box with nothing missing has no roll
-  call. Here are ten prices, every other one missing —
+  bitmap. It holds one answer per value, 1 for present and 0 for absent,
+  eight to a byte. A missing value keeps its place in the other trays as
+  an empty one, which the roll call hides. A box with nothing missing has
+  no roll call. Here are ten prices, every other one missing,
   `[None, 4.25] * 5`:
 
   ```text
@@ -181,12 +184,12 @@ Walk the packer's bench, one station per section:
   byte 0            0b10101010                 values 0–7
   ```
 
-  Each byte is read right to left: its lowest bit is the lowest value
-  number. Byte 0 holds values 0–7, byte 1 values 8 and 9, and the six
-  unused bits stay 0.
+  Read each byte right to left: its lowest bit is the lowest value
+  number. Byte 0 holds values 0–7, byte 1 holds values 8 and 9, and the
+  six unused bits stay 0.
 
 Here is how a picker who knows nothing reads the first box of prices
-from section D's `shop.bin` — a box with a roll call — step by step down
+from section D's `shop.bin`, a box with a roll call, step by step down
 the page:
 
 ```text
@@ -206,16 +209,16 @@ plain trays            100 answers in 13 bytes; 100 prices at 8 bytes, 0.0 where
 the prices             100 of them: 75 known, 25 missing
 ```
 
-Only two steps are new: cutting a box into its trays, and the roll call
-at the end. Everything else is yesterday's reader.
+Only two steps are new: cutting a box into its trays, and checking the
+roll call at the end. Everything else is yesterday's reader.
 
 ## 5. Lance concepts introduced
 
 - **Fixed-width and variable-width.** In Lance's words, "most types fall
   into two general paths. One for fixed-width data and one for
   variable-width data (where we recognize both 32-bit and 64-bit
-  offsets)." Ours follow Apache Arrow's offsets and data buffers, and a
-  list is offsets into a column of all its items.
+  offsets)." Ours follow Apache Arrow's offsets and data buffers. A list
+  is offsets into a column of all its items.
 
 - **A page holds several buffers.** "The number of buffers is variable
   and depends on the encoding." Our trays are those buffers.
@@ -227,12 +230,12 @@ at the end. Everything else is yesterday's reader.
   This means that within a group of 8 bits, we read right-to-left".
 
 - **No missing values, no bitmap.** "Arrays having a 0 null count may
-  choose to not allocate the validity bitmap" — ours never has one on
+  choose to not allocate the validity bitmap." Ours never has one on
   such a page.
 
 <div class="callout">
 
-**Where real Lance differs** — from its
+**Where real Lance differs.** These quotes come from its
 [encoding strategy](https://lance.org/format/file/encoding/) page and
 [file format](https://lance.org/format/file/):
 
@@ -251,14 +254,14 @@ at the end. Everything else is yesterday's reader.
    simple place to apply dictionary encoding is at the structural
    level": whole strings, not bytes inside a buffer. Lance also
    compresses string bytes with FSST, a compressor that replaces common
-   byte sequences with one-byte codes, and has a layout "for pages where
-   all (visible) values are the same scalar value or null".
+   byte sequences with one-byte codes. And it has a layout "for pages
+   where all (visible) values are the same scalar value or null".
 
 4. **Metadata per column.** "there is no need to read all file metadata if
    you are only interested in a subset of the columns. However, in many
    cases, the column descriptors are small enough that it is cheaper to
    read the entire footer in a single read than split it into multiple
-   reads." Ours always reads all of it; section D shows the cost.
+   reads." Ours always reads all of it, and section D shows the cost.
 
 </div>
 
@@ -276,11 +279,11 @@ at the end. Everything else is yesterday's reader.
 <a href="https://docs.python.org/3.12/library/string.html#format-specification-mini-language"><code>{x:.2f}</code> in an f-string: a number with two decimals</a>
 </div>
 
-First, the shop's orders, and what yesterday's packing rule makes of
-them. The table is the same eight orders as Day 1 — the same ids and
-quantities — as a shop really sends them. In `src/nanolance/orders.py`,
-between the closing `]` of `ORDERS` (line 32) and `def pack_value`
-(around line 35):
+First, meet the shop's orders, and see what yesterday's packing rule
+makes of them. The table holds Day 1's eight orders, with the same ids
+and quantities, as a shop really sends them. In
+`src/nanolance/orders.py`, add this between the closing `]` of `ORDERS`
+(line 32) and `def pack_value` (around line 35):
 
 ```python
 # ──────── new code starts here (around line 35) ────────
@@ -308,10 +311,10 @@ TAGGED_ORDERS: list[TaggedRow] = [
 # ──────── new code ends here ────────
 ```
 
-Orders 103 and 107 have no price yet: `None`. `TaggedRow` is the shape
-of one row, a type alias like Day 1's `Row`.
+Orders 103 and 107 have no price yet, so their price is `None`.
+`TaggedRow` is the shape of one row, a type alias like Day 1's `Row`.
 
-Now the demo, in `src/nanolance/cli.py` — four edits:
+Now the demo. Make four edits in `src/nanolance/cli.py`:
 
 1. Below `import argparse` (line 3), add
 
@@ -320,8 +323,8 @@ Now the demo, in `src/nanolance/cli.py` — four edits:
    ```
 
 2. Replace the `from nanolance.orders import …` line (line 10) with this
-   longer import — three more names than before, one per line, so it
-   stays readable:
+   longer import. It has three more names than before, one per line, so
+   it stays readable:
 
    ```python
    from nanolance.orders import (
@@ -336,8 +339,8 @@ Now the demo, in `src/nanolance/cli.py` — four edits:
    )
    ```
 
-3. Between the end of `packing` and `def main` (around line 292), the
-   demo:
+3. Between the end of `packing` and `def main` (around line 292), add
+   the demo:
 
    ```python
    # ──────── new code starts here (around line 292) ────────
@@ -403,15 +406,15 @@ Now the demo, in `src/nanolance/cli.py` — four edits:
 
 What `shapes` does so far:
 
-- It counts the padding in Day 3's thousand names:
+- It counts the padding in Day 3's thousand names.
   `len(row[3].encode("utf-8"))` is how many bytes a name really uses.
 
 - It asks Day 1's `pack_value` for a long name and a missing price. The
-  two refusals are different errors — our `ValueError` and `struct`'s
-  own `struct.error` — so `except` lists both.
+  two refusals are different errors, our `ValueError` and `struct`'s own
+  `struct.error`, so `except` lists both.
 
 - It tries the usual workaround, 0.0 for "unknown", on two honest
-  questions: the cheapest order, and the average price.
+  questions: the cheapest order and the average price.
 
 Run it:
 
@@ -438,23 +441,23 @@ pack None as a price: refused, required argument is not a float
 
 Read it line by line:
 
-- `names of Day 3's 1000 orders, …` — 6250 letters in 12000 bytes: 5750
-  bytes, almost half, are padding.
+- `names of Day 3's 1000 orders, …` — 6250 letters in 12000 bytes. The
+  other 5750 bytes, almost half, are padding.
 
-- `pack 'drill bits Ø6' as a name: refused, …` — `pack_value`: thirteen
-  characters, but `Ø` is two bytes in UTF-8.
+- `pack 'drill bits Ø6' as a name: refused, …` — `pack_value` refused
+  it. The name is thirteen characters, but `Ø` is two bytes in UTF-8.
 
-- `pack None as a price: refused, …` — `struct` itself refuses: an
-  8-byte float has no pattern for "unknown".
+- `pack None as a price: refused, …` — `struct` itself refuses, because
+  an 8-byte float has no pattern for "unknown".
 
 - `stored as 0.0 instead: …` and the average line — the workaround fails
-  twice: gloves look free, and two unknown prices drag the average from
+  twice. Gloves look free, and two unknown prices drag the average from
   10.92 to 8.19.
 
-Every problem here is the [packing rule](story.md#packing-rule) itself:
-one fixed width per column.
+Every problem here comes from the [packing rule](story.md#packing-rule)
+itself, with its one fixed width per column.
 
-Pin the demo with a test: at the bottom of `tests/test_cli.py`, a
+Pin the demo with a test. The bottom of `tests/test_cli.py` gains a
 `run_shapes` helper like Day 3's `run_packing`, and
 `test_shapes_shows_what_fixed_widths_cannot_say`, which checks the lines
 above word for word. Take the finished file rather than retyping a
@@ -474,7 +477,7 @@ uv run pytest -q
 88 passed in 0.63s
 ```
 
-Eighty-eight tests: yesterday's 87 and the new one.
+That makes eighty-eight tests: yesterday's 87 and the new one.
 
 **Section checkpoint:** `./scripts/compare.sh v1-day-04a`
 
@@ -493,9 +496,9 @@ Eighty-eight tests: yesterday's 87 and the new one.
 The fix for names comes from [Apache Arrow](https://arrow.apache.org/docs/format/Columnar.html#variable-size-binary-layout),
 and Lance stores text the same way. Write every name's bytes back to
 back, with no padding: that is the **data**. Then write where each name
-ends: those are the **offsets**. §4 drew the idea; now the code. Create
-`src/nanolance/shapes.py`, beginning with the constants and how a column
-says what kind it is:
+ends: those are the **offsets**. §4 drew the idea, and now you write the
+code. Create `src/nanolance/shapes.py`, beginning with the constants and
+how a column says what kind it is:
 
 ```python
 """Analogy: trays inside a box — values of any length kept in trays of
@@ -536,11 +539,11 @@ def format_of(kind: Kind) -> str:
     return kind if isinstance(kind, str) else kind.format
 ```
 
-A column's **kind** is either a fixed-width codec — the `struct.Struct`
-every column has had since Day 1 — or the name `"string"`. `kind_of`
+A column's **kind** is either a fixed-width codec (the `struct.Struct`
+every column has had since Day 1) or the name `"string"`. `kind_of`
 and `format_of` convert it to and from the metadata's "format" text.
 
-Below `format_of`, the offsets, and strings built from them:
+Below `format_of`, add the offsets, and strings built from them:
 
 ```python
 def offsets(lengths: list[int]) -> bytes:
@@ -577,14 +580,15 @@ def strings_from(trays: dict[str, bytes]) -> list[str]:
     return [data[start:stop].decode("utf-8") for start, stop in spans(trays["offsets"])]
 ```
 
-- `offsets` turns lengths `[5, 6, 7, 4]` into `0, 5, 11, 18, 22`;
-  `spans` reads them back as pairs, (0, 5), (5, 11), ….
+- `offsets` turns lengths `[5, 6, 7, 4]` into `0, 5, 11, 18, 22`.
+  `spans` reads them back as pairs: (0, 5), (5, 11), ….
 
 - `string_trays` returns both buffers in a dict, by name. Offsets count
   **bytes**, not characters: `Ø6` is three bytes.
 
-Last in the file, what the page file calls: `trays` to lay out one
-page, `values_from` to rebuild it, and three helpers they lean on:
+Last in the file come the functions the page file calls: `trays` to
+lay out one page, `values_from` to rebuild it, and three helpers they
+lean on:
 
 ```python
 def fixed_tray(codec: struct.Struct, values: list[Value]) -> bytes:
@@ -642,18 +646,19 @@ def values_from(kind: Kind, trays: dict[str, bytes]) -> list[Value]:
     return fixed_values(kind, trays["values"])
 ```
 
-- `fixed_tray` is Day 1's packing rule for any codec; `fixed_values`
+- `fixed_tray` is Day 1's packing rule for any codec. `fixed_values`
   is yesterday's cutting loop from `read_page`, moved here.
 
-- `trays` lays out one page as named buffers — `{"values": …}`, exactly
-  yesterday's plain page, or `{"offsets": …, "data": …}`. Each buffer is
-  a [tray](story.md#trays) of fixed-width values (`tray_codec` says which
-  width), so **Day 3's encodings work on each tray unchanged**.
+- `trays` lays out one page as named buffers. That is either
+  `{"values": …}`, exactly yesterday's plain page, or
+  `{"offsets": …, "data": …}`. Each buffer is a [tray](story.md#trays)
+  of fixed-width values (`tray_codec` says which width), so **Day 3's
+  encodings work on each tray unchanged**.
 
 Now the page file has to store a page of several trays, and say where
-each one is. Eight edits in `src/nanolance/page_file.py` (from here on,
-docstring-only changes at a checkpoint are left out — `compare.sh`
-ignores docstrings):
+each one is. Make eight edits in `src/nanolance/page_file.py`. (From
+here on, the steps leave out docstring-only changes at a checkpoint,
+because `compare.sh` ignores docstrings.)
 
 1. Replace the three `nanolance` imports (lines 16–18) with these four:
 
@@ -716,9 +721,9 @@ ignores docstrings):
        codecs: dict[str, Kind]
    ```
 
-5. Replace the beginning of `write` — from `def write(` (around line
-   101 now) down to the page loop's `out.write(data)` (around line 127) —
-   with three new helpers and a new beginning for `write`. The
+5. Replace the beginning of `write`, from `def write(` (around line
+   101 now) down to the page loop's `out.write(data)` (around line 127).
+   Put in three new helpers and a new beginning for `write`. The
    metadata and footer code below the loop stays:
 
    ```python
@@ -786,9 +791,9 @@ ignores docstrings):
                    out.write(data)
    ```
 
-6. Further down in `write`, three lines of the metadata change — a
-   column's format comes from its kind, and each page's entry from
-   `entry` (lines 114–117, now around line 169):
+6. Further down in `write`, three lines of the metadata change (lines
+   114–117, now around line 169). A column's format now comes from its
+   kind, and each page's entry from `entry`:
 
    ```python
    def write(
@@ -859,9 +864,9 @@ ignores docstrings):
        return f.read(stop - start).decode("utf-8")
    ```
 
-8. At the end of `read_metadata`, two lines read kinds and pages
-   differently (lines 208–209, now around line 291), and a helper
-   follows the function:
+8. At the end of `read_metadata`, two lines now read kinds and pages
+   differently (lines 208–209, now around line 291). A helper follows
+   the function:
 
    ```python
    def read_metadata(f: CountingFile) -> Metadata:
@@ -886,15 +891,15 @@ ignores docstrings):
 
 - **`Tray`** is one buffer: its name, size, `count` of fixed-width
   values (a bit-packed decoder needs it), and its own packing note.
-  `pack_page` packs each tray on its own — `"smallest"` runs the
+  `pack_page` packs each tray on its own, so `"smallest"` runs the
   [weigh-in](story.md#weigh-in) once per tray.
 
-- **The version.** Trays change what a file means, so it is 3.
+- **The version.** Trays change what a file means, so the version is 3.
   `page_from` gives an entry without `trays` an empty tuple, so version 1
   and 2 files read as one-tray pages (a test below proves it). Sections
   C and D add trays to version 3 before the day ends.
 
-Now the demo. In `src/nanolance/cli.py`, three edits:
+Now the demo. Make three edits in `src/nanolance/cli.py`:
 
 1. Below the `from nanolance.page_file import …` line (line 21):
 
@@ -902,8 +907,8 @@ Now the demo. In `src/nanolance/cli.py`, three edits:
    from nanolance.shapes import STRING, fixed_values
    ```
 
-2. Between the end of `packing` and `def shapes` (around line 293), two
-   helpers:
+2. Between the end of `packing` and `def shapes` (around line 293), add
+   two helpers:
 
    ```python
    # ──────── new code starts here (around line 293) ────────
@@ -934,7 +939,7 @@ Now the demo. In `src/nanolance/cli.py`, three edits:
    # ──────── new code ends here ────────
    ```
 
-3. At the end of `shapes` (around line 352), after the average:
+3. At the end of `shapes` (around line 352), after the average, add:
 
    ```python
        # ──────── new code starts here (around line 352) ────────
@@ -979,9 +984,9 @@ Now the demo. In `src/nanolance/cli.py`, three edits:
    ```
 
 `read_back` reads every column using only the file. `tray_bytes` adds
-up a column's trays by name and note; `Counter` starts a new key at 0.
-The demo stores Day 3's orders with `name` as a string —
-`{**COLUMNS, "name": STRING}` — once plain and once weighed. Then it
+up a column's trays by name and note, and `Counter` starts a new key at
+0. The demo stores Day 3's orders with `name` as a string
+(`{**COLUMNS, "name": STRING}`), once plain and once weighed. Then it
 stores the shop's own names, and fetches one name both ways. Both
 one-name reads start from a page the picker already knows, so the tally
 counts only the value.
@@ -1022,33 +1027,34 @@ one name, row 4, from a box the picker already knows:
 Read the new lines one by one:
 
 - `the same names as strings (…)` — the yardstick: yesterday's slots,
-  plain and weighed (the [lid legend](story.md#lid-legend) won).
+  plain and weighed. (The [lid legend](story.md#lid-legend) won.)
 
-- `strings.bin: 10290 bytes = …` — the [letter strip](story.md#letter-strip),
-  6250 bytes, plus the end marks: 10 pages × 101 marks × 4 bytes = 4040.
-  Plain against plain, 1710 bytes fewer than the slots.
+- `strings.bin: 10290 bytes = …` — the [letter strip](story.md#letter-strip)
+  takes 6250 bytes, plus the end marks: 10 pages × 101 marks × 4 bytes =
+  4040. Plain against plain, that is 1710 bytes fewer than the slots.
 
-- `strings-smallest.bin: 6765 bytes = …` — each tray weighed on its own:
-  a page's end marks never pass 628, and 628 is under 1024 = 2¹⁰, so 10
-  bits each instead of 32; every letter is below 128 = 2⁷, so 7 bits
-  instead of 8.
+- `strings-smallest.bin: 6765 bytes = …` — each tray weighed on its own.
+  A page's end marks never pass 628, and 628 is under 1024 = 2¹⁰, so they
+  take 10 bits each instead of 32. Every letter is below 128 = 2⁷, so it
+  takes 7 bits instead of 8.
 
-- But 6765 is more than the slots' 2000: the lid legend wrote eight names
-  once; the strip writes every name every time. A dictionary of *whole*
-  strings would remove both padding and repetition — real Lance's (§5),
-  not ours.
+- But 6765 is more than the slots' 2000. The lid legend wrote eight names
+  once, while the strip writes every name every time. A dictionary of
+  *whole* strings would remove both padding and repetition. Real Lance
+  has one (§5); ours does not.
 
 - `read back … True` (twice), and `drill bits Ø6` among the shop's
-  names — every name back, the refused one included.
+  names — every name came back, the refused one included.
 
 - `padded.bin: 'drill bits' — tally: reads 1, bytes read 12, seeks 1`
-  against `strings.bin: … reads 2, bytes read 18, seeks 2` —
-  one trip for two end marks (8 bytes), one for 10 letters. Fewer bytes,
-  one more trip — and on a disk or in the cloud, the trip is what costs.
+  against `strings.bin: … reads 2, bytes read 18, seeks 2` — one trip
+  for two end marks (8 bytes), and one for 10 letters. That is fewer
+  bytes but one more trip, and on a disk or in the cloud, the trip is
+  what costs.
 
-Now the other direction: yesterday's reader meeting a version 3 file.
-Save Day 3's `page_file.py` next to the warehouse files and point it at
-`strings.bin`:
+Now try the other direction: yesterday's reader meeting a version 3
+file. Save Day 3's `page_file.py` next to the warehouse files and point
+it at `strings.bin`:
 
 ```bash
 git show v1-day-03:src/nanolance/page_file.py > warehouse/day3_page_file.py
@@ -1075,8 +1081,8 @@ ValueError: nanolance file version 3; this reader reads versions 1 to 2
 Yesterday's reader saw edition 3 and [turned around](story.md#stamp),
 instead of misreading a box of trays.
 
-Pin it all with tests — six edits in three files, all made by one
-checkout of the finished test files:
+Pin it all with tests. There are six edits in three files, and one
+checkout of the finished test files makes them all:
 
 ```bash
 git checkout v1-day-04b -- tests/test_shapes.py tests/test_page_file.py tests/test_cli.py
@@ -1085,8 +1091,8 @@ git checkout v1-day-04b -- tests/test_shapes.py tests/test_page_file.py tests/te
 <details>
 <summary>Copy-friendly: what the six edits are, with two of the tests (click to open)</summary>
 
-1. A new `tests/test_shapes.py`, twelve tests. Its heart is the round
-   trip — six pages through the trays and back, from no values to a
+1. A new `tests/test_shapes.py` holds twelve tests. Its heart is the
+   round trip: six pages through the trays and back, from no values to a
    70,000-byte name, past what a 2-byte offset could reach:
 
    ```python
@@ -1111,11 +1117,13 @@ git checkout v1-day-04b -- tests/test_shapes.py tests/test_page_file.py tests/te
    `TAGGED_ORDERS`, `Tray`, and `STRING`.
 
 3. In `tests/test_page_file.py`, `test_another_version_is_refused` used
-   version 3 as "another version" — now ours — so it uses version 4.
+   version 3 as "another version". Version 3 is now ours, so the test
+   uses version 4.
 
-4. At the bottom of `tests/test_page_file.py`, four tests: a page's exact
-   trays, a version 2 file made by rewriting today's footer, the refusal
-   of packed trays, and the two trips of `read_string`:
+4. The bottom of `tests/test_page_file.py` gains four tests. They cover
+   a page's exact trays, a version 2 file made by rewriting today's
+   footer, the refusal of packed trays, and the two trips of
+   `read_string`:
 
    ```python
    def test_one_string_costs_two_reads_its_offsets_then_its_bytes(tmp_path):
@@ -1128,8 +1136,9 @@ git checkout v1-day-04b -- tests/test_shapes.py tests/test_page_file.py tests/te
    ```
 
 5. In `tests/test_cli.py`, `test_pages_opens_the_file_from_its_footer`
-   expects `version 2` twice (lines 100 and 103): now `version 3`. Day 2's
-   demo writes the same bytes as before, apart from the version.
+   expected `version 2` twice (lines 100 and 103), and now expects
+   `version 3`. Day 2's demo writes the same bytes as before, apart from
+   the version.
 
 6. At the bottom of `tests/test_cli.py`,
    `test_shapes_stores_names_as_strings` pins the nine new lines of the
@@ -1147,8 +1156,8 @@ uv run pytest -q
 105 passed in 0.64s
 ```
 
-A hundred and five tests: seventeen more — twelve for the trays, four
-for the page file, one for the demo.
+That makes a hundred and five tests. The seventeen new ones are twelve
+for the trays, four for the page file, and one for the demo.
 
 **Section checkpoint:** `./scripts/compare.sh v1-day-04b`
 
@@ -1159,18 +1168,18 @@ for the page file, one for the demo.
 <a href="https://docs.python.org/3.12/library/stdtypes.html#boolean-type-bool"><code>sum(not x for …)</code>: <code>True</code> adds up as 1, so this counts</a>
 </div>
 
-A list of strings needs one more set of offsets on top of a string
-column: where each order's list ends, counted in **items** — a
-[bundle](story.md#bundles) per order. Seven edits in
-`src/nanolance/shapes.py`:
+Your strings now fit any length. A list of strings needs one more set
+of offsets on top of a string column. They say where each order's list
+ends, counted in **items**, with one [bundle](story.md#bundles) per
+order. Make seven edits in `src/nanolance/shapes.py`:
 
-1. Below `STRING = "string"` (line 19), the name of the new kind:
+1. Below `STRING = "string"` (line 19), add the name of the new kind:
 
    ```python
    STRING_LIST = "list<string>"
    ```
 
-2. Replace the `Value` line (line 24) — a value may now be a list:
+2. Replace the `Value` line (line 24), because a value may now be a list:
 
    ```python
    Value = int | float | str | list[str]
@@ -1182,7 +1191,7 @@ column: where each order's list ends, counted in **items** — a
        if format_name in (STRING, STRING_LIST):
    ```
 
-4. Between `strings_from` and `fixed_tray` (around line 75):
+4. Between `strings_from` and `fixed_tray` (around line 75), add:
 
    ```python
    # ──────── new code starts here (around line 75) ────────
@@ -1209,7 +1218,7 @@ column: where each order's list ends, counted in **items** — a
    # ──────── new code ends here ────────
    ```
 
-5. In `trays`, after the string branch (around line 132):
+5. In `trays`, after the string branch (around line 132), add:
 
    ```python
    def trays(kind: Kind, values: list[Value]) -> dict[str, bytes]:
@@ -1230,7 +1239,7 @@ column: where each order's list ends, counted in **items** — a
        if name in ("list offsets", "offsets"):
    ```
 
-7. In `values_from`, after the string branch (around line 150):
+7. In `values_from`, after the string branch (around line 150), add:
 
    ```python
    def values_from(kind: Kind, trays: dict[str, bytes]) -> list[Value]:
@@ -1245,12 +1254,12 @@ column: where each order's list ends, counted in **items** — a
    ```
 
 `list_trays` puts one tray, the **list offsets**, in front of the
-items' two string trays; `lists_from` cuts the items at those offsets.
-An empty list is two equal offsets. `page_file.py` needs no change: it
-already handles any number of trays.
+items' two string trays. `lists_from` cuts the items at those offsets.
+An empty list is two equal offsets. `page_file.py` needs no change,
+because it already handles any number of trays.
 
-The demo needs more orders. At the bottom of `src/nanolance/orders.py`
-(around line 90):
+The demo needs more orders. Add these at the bottom of
+`src/nanolance/orders.py` (around line 90):
 
 ```python
 # ──────── new code starts here (around line 90) ────────
@@ -1268,7 +1277,7 @@ def many_tagged_orders(n_rows: int) -> list[TaggedRow]:
 # ──────── new code ends here ────────
 ```
 
-Then three edits in `src/nanolance/cli.py`:
+Then make three edits in `src/nanolance/cli.py`:
 
 1. Replace the `from nanolance.shapes import …` line (line 22) with
 
@@ -1290,7 +1299,8 @@ Then three edits in `src/nanolance/cli.py`:
    )
    ```
 
-3. At the end of `shapes` (around line 390), after the one-name reads:
+3. At the end of `shapes` (around line 390), after the one-name reads,
+   add:
 
    ```python
        # ──────── new code starts here (around line 390) ────────
@@ -1342,22 +1352,24 @@ tags of 1000 shop orders: 875 tags, 375 empty lists
 Read it line by line:
 
 - `list offsets: [0, 1, 1, 3, 3, 4, 5, 5, 7]` — the bundle marks, nine
-  for eight orders, counted in tags: order 0's bundle is tags 0 to 1
-  (`bulk`), order 1's is 1 to 1 — empty — and order 2's is 1 to 3
+  for eight orders, counted in tags. Order 0's bundle is tags 0 to 1
+  (`bulk`). Order 1's is 1 to 1, which is empty. Order 2's is 1 to 3
   (`bulk`, `small parts`).
 
 - `offsets` and `data` — the seven tags as a string column, as in
-  section B: tag 2, `small parts`, is bytes 8 to 19 of the
+  section B. Tag 2, `small parts`, is bytes 8 to 19 of the
   [letter strip](story.md#letter-strip).
 
-- `tags.bin: 12705 bytes = …` — 101 list offsets per page, one offset
-  per tag plus one per page ((875 + 10) × 4 = 3540), and the letters;
-  the 375 empty bundles cost only their list offsets.
+- `tags.bin: 12705 bytes = …` — 101 list offsets per page, then one
+  offset per tag plus one per page ((875 + 10) × 4 = 3540), and the
+  letters. The 375 empty bundles cost only their list offsets.
 
 - `tags-smallest.bin: 6465 bytes = …` — the list offsets never pass 88
-  in a page, and 88 < 128 = 2⁷, so 7 bits each. Both files read back.
+  in a page, and 88 < 128 = 2⁷, so they take 7 bits each. Both files
+  read back.
 
-Pin it with tests — four edits in two files, all made by one checkout:
+Pin it with tests. There are four edits in two files, and one checkout
+makes them all:
 
 ```bash
 git checkout v1-day-04c -- tests/test_shapes.py tests/test_cli.py
@@ -1371,10 +1383,10 @@ git checkout v1-day-04c -- tests/test_shapes.py tests/test_cli.py
 2. `test_a_kind_is_recorded_by_its_format` gains a line for
    `STRING_LIST`.
 
-3. At the bottom of `tests/test_shapes.py`, seven tests: one exact
-   layout — where `[]` and `[""]` must stay different — and six pages
-   through the trays and back, including only empty lists and a list of
-   a thousand tags. The layout test:
+3. The bottom of `tests/test_shapes.py` gains seven tests. One pins an
+   exact layout, where `[]` and `[""]` must stay different. Six send
+   pages through the trays and back, including only empty lists and a
+   list of a thousand tags. Here is the layout test:
 
    ```python
    def test_a_list_is_offsets_into_its_items():
@@ -1401,8 +1413,8 @@ uv run pytest -q
 113 passed in 0.72s
 ```
 
-A hundred and thirteen tests: eight more — seven for the trays, one
-for the demo.
+That makes a hundred and thirteen tests, eight more: seven for the
+trays and one for the demo.
 
 **Section checkpoint:** `./scripts/compare.sh v1-day-04c`
 
@@ -1414,20 +1426,21 @@ for the demo.
 <a href="https://docs.python.org/3.12/library/stdtypes.html#common-sequence-operations"><code>[None, 4.25] * 5</code>: a list repeated five times, end to end</a>
 </div>
 
-A page with a missing value gets one more tray in front, a
+Strings and lists now fit. The last problem is missing values. A page
+with a missing value gets one more tray in front, a
 [roll call](story.md#roll-call) of one bit per value. Every other tray
 keeps an empty place for the missing value, so value *k* stays value
-*k* in every tray. Six edits
-in `src/nanolance/shapes.py`:
+*k* in every tray. Make six edits in `src/nanolance/shapes.py`:
 
-1. Replace the `Value` line (line 26) — a value may now be missing:
+1. Replace the `Value` line (line 26), because a value may now be
+   missing:
 
    ```python
    Value = int | float | str | list[str] | None  # None: missing
    ```
 
-2. Between `lists_from` and `fixed_tray` (around line 95), the roll call
-   and its reader:
+2. Between `lists_from` and `fixed_tray` (around line 95), add the roll
+   call and its reader:
 
    ```python
    # ──────── new code starts here (around line 95) ────────
@@ -1471,7 +1484,7 @@ in `src/nanolance/shapes.py`:
    ```
 
 4. In `trays`, replace the body below the docstring (lines 130–134, now
-   around line 157) with one that builds the trays in a dict, roll call
+   around line 157). The new body builds the trays in a dict, roll call
    first:
 
    ```python
@@ -1499,7 +1512,7 @@ in `src/nanolance/shapes.py`:
    ```
 
 6. In `values_from`, replace the body below the docstring (lines 148–152,
-   now around line 181) with one that hides what the roll call marks
+   now around line 181). The new body hides what the roll call marks
    missing:
 
    ```python
@@ -1521,13 +1534,14 @@ in `src/nanolance/shapes.py`:
        # ──────── replacement ends here ────────
    ```
 
-`roll_call` uses Day 3's bit-packing trick: one big whole number, bit
-*k* set when value *k* is present, written lowest byte first — Arrow's
-order. `trays` writes one only when `None in values`.
+`roll_call` uses Day 3's bit-packing trick. It builds one big whole
+number, with bit *k* set when value *k* is present, and writes it lowest
+byte first, in Arrow's order. `trays` writes a roll call only when
+`None in values`.
 
 The roll call stays plain, whatever the column asks for. In
 `src/nanolance/page_file.py`, in `pack_page`'s tray loop, replace the
-`used, stored = pack(name, codec, plain)` line (line 125) with two:
+`used, stored = pack(name, codec, plain)` line (line 125) with these two:
 
 ```python
 def pack_page(
@@ -1540,10 +1554,11 @@ def pack_page(
         # ──────── replacement ends here ────────
 ```
 
-Why plain? It is one bit per value, next to a price's 64, and plain
-keeps "is value *k* here?" arithmetic: bit *k* is in byte *k* ÷ 8.
+Why plain? The roll call costs one bit per value, next to a price's 64.
+And plain keeps "is value *k* here?" arithmetic: bit *k* is in byte
+*k* ÷ 8.
 
-Now the whole table. In `src/nanolance/orders.py`, two edits:
+Now the whole table. Make two edits in `src/nanolance/orders.py`:
 
 1. Below `import struct` (line 3):
 
@@ -1552,7 +1567,7 @@ Now the whole table. In `src/nanolance/orders.py`, two edits:
    ```
 
 2. Between the closing `]` of `TAGGED_ORDERS` (line 53, now around line
-   55) and `def pack_value`:
+   55) and `def pack_value`, add:
 
    ```python
    # ──────── new code starts here (around line 57) ────────
@@ -1564,7 +1579,7 @@ Now the whole table. In `src/nanolance/orders.py`, two edits:
    # ──────── new code ends here ────────
    ```
 
-And the demo, in `src/nanolance/cli.py` — five edits:
+Then the demo. Make five edits in `src/nanolance/cli.py`:
 
 1. In the `from nanolance.orders import (` block, above `TAGGED_ORDERS,`
    (line 16):
@@ -1581,8 +1596,8 @@ And the demo, in `src/nanolance/cli.py` — five edits:
    )
    ```
 
-2. Replace the `from nanolance.shapes import …` line (line 23) — one
-   more name makes it too long for one line:
+2. Replace the `from nanolance.shapes import …` line (line 23). One more
+   name makes it too long for one line:
 
    ```python
    from nanolance.shapes import (
@@ -1595,9 +1610,9 @@ And the demo, in `src/nanolance/cli.py` — five edits:
    )
    ```
 
-3. In `tray_bytes`, a column whose pages have no trays — `id` and `qty`
-   in the whole table — counts each page under its own packing note. At
-   the top of the loop (around line 321):
+3. In `tray_bytes`, a column whose pages have no trays (`id` and `qty`
+   in the whole table) counts each page under its own packing note. At
+   the top of the loop (around line 321), add:
 
    ```python
    def tray_bytes(boxes: list[Page]) -> str:
@@ -1611,8 +1626,8 @@ And the demo, in `src/nanolance/cli.py` — five edits:
            for tray in page.trays:
    ```
 
-4. Between `tray_bytes` and `shapes` (around line 329), a question asked
-   of a fresh open:
+4. Between `tray_bytes` and `shapes` (around line 329), add a question
+   asked of a fresh open:
 
    ```python
    # ──────── new code starts here (around line 329) ────────
@@ -1634,7 +1649,7 @@ And the demo, in `src/nanolance/cli.py` — five edits:
    # ──────── new code ends here ────────
    ```
 
-5. At the end of `shapes` (around line 438):
+5. At the end of `shapes` (around line 438), add:
 
    ```python
        # ──────── new code starts here (around line 438) ────────
@@ -1667,7 +1682,7 @@ And the demo, in `src/nanolance/cli.py` — five edits:
    ```
 
 `ask` is Day 3's `ask_qty` for any column. The demo writes the whole
-table, every column weighed, and asks three questions. Run it:
+table with every column weighed, and asks three questions. Run it:
 
 ```bash
 uv run nanolance shapes
@@ -1694,30 +1709,32 @@ names of rows 10–19 from shop.bin = ['washers', 'tape', 'drill bits Ø6', 'nai
 Read it line by line:
 
 - `write shop.bin: …` — all five columns in one file. `id` and `qty`
-  have nothing missing, so no trays: yesterday's pages exactly.
+  have nothing missing, so they get no trays: exactly yesterday's pages.
 
 - `price: 1730 = validity plain 130 + …` — the
-  [roll call](story.md#roll-call), 13 bytes a page; the dictionary's
+  [roll call](story.md#roll-call) takes 13 bytes a page. The dictionary's
   legend holds a 0.0 that the roll call hides.
 
-- `name: … data plain 6750` — `Ø`'s two bytes are above 127, so letters
-  need all 8 bits and stay plain. The whole table reads back `True`.
+- `name: … data plain 6750` — `Ø`'s two bytes are above 127, so the
+  letters need all 8 bits and stay plain. The whole table reads back
+  `True`.
 
-- `sum(qty) … = 8125` — the [stock count](story.md#stock-count): the
-  same 760 bytes of pages as yesterday. But the opening is 7972 bytes,
-  three times yesterday's 2668: partly the new tags column, mostly one
-  box-list line per tray (in the two files' metadata, 2709 of the 5304
-  extra bytes are the tags column's, 2594 are price's and name's new
-  tray lines). With Lance's recommended 8 MB pages that would be a
-  sliver; here it is most of a small question — the cost §5's
-  per-column metadata avoids, left deliberately naive here.
+- `sum(qty) … = 8125` — the [stock count](story.md#stock-count) reads
+  the same 760 bytes of pages as yesterday. But the opening is 7972
+  bytes, three times yesterday's 2668. Of the 5304 extra bytes, about
+  half are the new tags column's metadata. Most of the rest is one
+  box-list line per tray, for price's and name's new trays. With Lance's
+  recommended 8 MB pages that would be a sliver. Here it is most of a
+  small question. That is the cost §5's per-column metadata avoids, left
+  deliberately naive here.
 
 - `average price from shop.bin = 10.92, 250 missing` — the honest
-  answer section A could not give; 130 of its 1730 page bytes are the
+  answer section A could not give. Of its 1730 page bytes, 130 are the
   roll call, the whole cost of knowing. Ten names read 798 bytes: one
-  page, its two trays in one trip.
+  page, with its two trays in one trip.
 
-Pin it with tests — four edits in three files, all made by one checkout:
+Pin it with tests. There are four edits in three files, and one
+checkout makes them all:
 
 ```bash
 git checkout v1-day-04d -- tests/test_shapes.py tests/test_page_file.py tests/test_cli.py
@@ -1726,10 +1743,10 @@ git checkout v1-day-04d -- tests/test_shapes.py tests/test_page_file.py tests/te
 <details>
 <summary>Copy-friendly: what the four edits are, with one of the tests (click to open)</summary>
 
-1. At the bottom of `tests/test_shapes.py`, eight tests: all-missing
-   pages of each kind, `None` next to `""` and `[]`, missing prices
-   across a byte boundary, and the bitmap itself — with the example
-   from Arrow's own documentation:
+1. The bottom of `tests/test_shapes.py` gains eight tests. They cover
+   all-missing pages of each kind, `None` next to `""` and `[]`, missing
+   prices across a byte boundary, and the bitmap itself, using the
+   example from Arrow's own documentation:
 
    ```python
    def test_the_validity_bitmap_has_one_bit_per_value_lowest_bit_first():
@@ -1748,9 +1765,10 @@ git checkout v1-day-04d -- tests/test_shapes.py tests/test_page_file.py tests/te
 2. In `tests/test_page_file.py`, the `from nanolance.orders import` line
    (line 7) gains `TAGGED_COLUMNS` and `many_tagged_orders`.
 
-3. At the bottom of `tests/test_page_file.py`, two tests: a page of 100
-   missing prices (its roll call plain, its 100 zeros one
-   [stack](story.md#stacks)), and the whole table, plain and weighed.
+3. The bottom of `tests/test_page_file.py` gains two tests. One stores a
+   page of 100 missing prices, with its roll call plain and its 100 zeros
+   one [stack](story.md#stacks). The other stores the whole table, plain
+   and weighed.
 
 4. At the bottom of `tests/test_cli.py`,
    `test_shapes_stores_the_shop_table_with_its_missing_prices` pins the
@@ -1768,10 +1786,10 @@ uv run pytest -q
 124 passed in 0.83s
 ```
 
-A hundred and twenty-four tests: eleven more — eight for the trays, two
-for the page file, and one for the demo.
+That makes a hundred and twenty-four tests. The eleven new ones are
+eight for the trays, two for the page file, and one for the demo.
 
-**Section checkpoint:** `./scripts/compare.sh v1-day-04d` — which is
+**Section checkpoint:** `./scripts/compare.sh v1-day-04d`. This one is
 also the finished day.
 
 ## 7. Run it
@@ -1830,20 +1848,22 @@ names of rows 10–19 from shop.bin = ['washers', 'tape', 'drill bits Ø6', 'nai
   tally: reads 3, bytes read 8770, seeks 3 (opening 7972, pages 798)
 ```
 
-Nothing here varies between runs: no randomness, no timing, only counts.
+Nothing here varies between runs. There is no randomness and no timing,
+only counts.
 
 ## 9. Test it
 
-`uv run pytest -q` now runs a hundred and twenty-four tests — the
-`124 passed` of section D. That is Day 3's 87 plus 37 new ones: the
-felt problems (section A, 1 test), strings and trays (section B, 17),
-lists (section C, 8), and missing values (section D, 11). A hundred and
-seven are unit tests; the other seventeen (`test_cli_says_hello` and the
-sixteen in `test_cli.py`) run the real command line.
+`uv run pytest -q` now runs a hundred and twenty-four tests, the
+`124 passed` of section D. That is Day 3's 87 plus 37 new ones. They
+cover the felt problems (section A, 1 test), strings and trays (section
+B, 17), lists (section C, 8), and missing values (section D, 11). A
+hundred and seven are unit tests. The other seventeen
+(`test_cli_says_hello` and the sixteen in `test_cli.py`) run the real
+command line.
 
 ## 10. Break it deliberately
 
-Write the roll call's bytes in the wrong order. In `roll_call` in
+Now write the roll call's bytes in the wrong order. In `roll_call` in
 `src/nanolance/shapes.py`, change one word:
 
 ```diff
@@ -1867,14 +1887,14 @@ E   AssertionError: assert [(101, 4.25, ...'bulk']), ...] == [(101, 4.25, ...'bu
 E   assert [None, 4.25, ...ne, None, ...] == [None, 4.25, ...ne, 4.25, ...]
 ```
 
-(Only the `E` lines are shown — one per failing test. Pytest's summary
+(Only the `E` lines are shown, one per failing test. Pytest's summary
 line reads `3 failed, 121 passed`.)
 
 The demo, the whole table, and the ten prices across a byte boundary
-fail. The passing tests are the lesson: a page of eight values or fewer
-is one byte, the same in either order, and an all-missing page is zeros
-either way. Here are §4's ten prices — before the change, this command
-printed the first output below:
+fail. The passing tests are the lesson. A page of eight values or fewer
+has a one-byte roll call, the same in either order, and an all-missing
+page is zeros either way. Here are §4's ten prices. Before the change,
+this command printed the first output below:
 
 ```bash
 uv run python -c 'from nanolance.shapes import roll_call; print(roll_call([None, 4.25] * 5).hex(" "))'
@@ -1884,17 +1904,17 @@ uv run python -c 'from nanolance.shapes import roll_call; print(roll_call([None,
 aa 02
 ```
 
-That is `"little"`: byte 0 is `aa` (`0b10101010`, values 0–7), byte 1
-is `02` (values 8 and 9). With `"big"`, it prints:
+That is `"little"`. Byte 0 is `aa` (`0b10101010`, values 0–7), and
+byte 1 is `02` (values 8 and 9). With `"big"`, it prints:
 
 ```text
 02 aa
 ```
 
-The bytes swap: the reader takes `02` for values 0–7, so 3, 5, and 7
+The bytes swap. The reader takes `02` for values 0–7, so 3, 5, and 7
 read as absent.
 
-And how quietly the demo goes wrong — its `shop.bin` lines:
+And here is how quietly the demo goes wrong, in its `shop.bin` lines:
 
 ```bash
 uv run nanolance shapes
@@ -1907,11 +1927,11 @@ average price from shop.bin = 10.92, 280 missing
   tally: reads 12, bytes read 9702, seeks 12 (opening 7972, pages 1730)
 ```
 
-No error, and 280 prices missing instead of 250: thirty real prices
-gone. By luck the average stays 10.92 — a wrong answer that looks
-right. **A validity bitmap is correct only if
-writer and reader agree on two orders: which byte holds values 0–7, and
-which bit inside it is value 0.** Arrow writes both down.
+There is no error, and 280 prices are missing instead of 250: thirty
+real prices gone. By luck the average stays 10.92, a wrong answer that
+looks right. **A validity bitmap is correct only if writer and reader
+agree on two orders: which byte holds values 0–7, and which bit inside
+it is value 0.** Arrow writes both down.
 
 Change `"big"` back and confirm `uv run pytest -q` is green again.
 
@@ -1940,12 +1960,12 @@ nanolance 0.1.0: scaffold is alive
 GREEN: all gates passed
 ```
 
-Formatting, lints, the 124 tests, the smoke gate's four demos — now
-including `nanolance shapes` — and the book build all pass.
+Formatting, lints, the 124 tests, the smoke gate's four demos (now
+including `nanolance shapes`), and the book build all pass.
 
 The smoke gate gained one line today: `uv run --locked nanolance shapes
 "$scratch"`. `scripts/check.sh` is course infrastructure, outside what
-`compare.sh` checks; to pick up today's copy, take it from the
+`compare.sh` checks. To pick up today's copy, take it from the
 checkpoint:
 
 ```bash
@@ -1955,7 +1975,7 @@ git checkout v1-day-04 -- scripts/check.sh
 Then close out the day in whichever mode you are following:
 
 **Built along on your own branch?** Confirm your code matches the finished
-day — the final ✓ line means it does:
+day. The final ✓ line means it does:
 
 ```bash
 ./scripts/compare.sh v1-day-04
@@ -1970,7 +1990,7 @@ uv run nanolance shapes
 git switch -          # back to where you were
 ```
 
-**Either way**, today's complete change set — docs included — reads as one
+**Either way**, today's complete change set, docs included, reads as one
 diff:
 
 ```bash
@@ -1979,22 +1999,25 @@ git diff v1-day-03 v1-day-04
 
 ## 12. Recap
 
-**What changed today:** a new `shapes.py` (strings, lists, and the
-roll call as trays of fixed-width values); in `page_file.py`, `Tray`,
-`pack_page`, a `write` for any table's `columns`, `read_page` for trays,
-`read_string`, and format `VERSION` 3; the shop's table in `orders.py`;
-the `nanolance shapes` demo; and thirty-seven new tests (124 in all),
-still with no dependencies.
+**What changed today:** you wrote a new `shapes.py`, which stores
+strings, lists, and the roll call as trays of fixed-width values.
+`page_file.py` gained `Tray`, `pack_page`, a `write` for any table's
+`columns`, `read_page` for trays, `read_string`, and format `VERSION` 3.
+`orders.py` gained the shop's table, and `cli.py` the `nanolance shapes`
+demo. Thirty-seven new tests (124 in all) pin it, still with no
+dependencies.
 
-**Deliberately naive:** 4-byte offsets only (a page's text stops at
-4 GiB); dictionaries of tray bytes, never of whole strings; no single
-value from a packed tray; full width for a missing number; a plain roll
-call even on an all-missing page; lists of strings only; and every open
-reads every column's box lists, tray by tray, in wordy JSON.
+**Deliberately naive:** offsets are 4 bytes only, so a page's text stops
+at 4 GiB. Dictionaries work on tray bytes, never on whole strings. You
+cannot read a single value from a packed tray. A missing number still
+takes its full width. The roll call stays plain even on an all-missing
+page. Lists hold strings only. And every open reads every column's box
+lists, tray by tray, in wordy JSON.
 
 **Tomorrow, on Day 5:** today's one-name read began from a box the
-picker already knew. Tomorrow the picker gets only a row number — order
-7,342 — and finds the box, then the value, reading nothing else; and you
-count how much less that reads than Parquet-style groups of whole rows. The boxes now hold trays of every shape — see [the
-warehouse](story.md); next, the picker learns to go straight to one
+picker already knew. Tomorrow the picker gets only a row number, such as
+order 7,342, and finds the box, then the value, reading nothing else.
+You will count how much less that reads than Parquet-style groups of
+whole rows. The boxes now hold trays of every shape (see [the
+warehouse](story.md)). Next, the picker learns to go straight to one
 order.

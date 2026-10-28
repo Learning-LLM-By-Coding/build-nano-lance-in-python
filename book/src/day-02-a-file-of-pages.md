@@ -42,14 +42,14 @@ dependencies**: `json` and `dataclasses` come with Python.
 
 ## 1. What you will have running
 
-By the end of today, `uv run nanolance pages` stores a bigger table — a
-thousand orders — in a new kind of file: one that **describes itself**.
+By the end of today, `uv run nanolance pages` stores a bigger table, a
+thousand orders, in a new kind of file: one that **describes itself**.
 Yesterday's files were anonymous bytes. To read one, the reader had to
-know from outside how many rows it held and how wide each value was, and
+know from outside how many rows it held and how wide each value was. And
 a question about a few rows still read a whole column. Today's file fixes
-both:
+both problems:
 
-- **Each column is cut into pages** — runs of 100 values — so a question
+- **Each column is cut into pages**, runs of 100 values each. A question
   about ten rows reads the one page that holds them, not the whole
   column.
 
@@ -59,9 +59,9 @@ both:
   the end, reads the footer, reads the description, and then reads only
   the pages its question needs.
 
-- **The footer ends with a name.** Its last four
-  bytes spell the format's name, and a format version number sits next to them,
-  so a file that is not ours is refused — by name — after one small read.
+- **The footer ends with a name.** Its last four bytes spell the format's
+  name, and a format version number sits next to them. So the reader
+  refuses a file that is not ours, by name, after one small read.
 
 Every claim is a count again: reads, bytes read, and seeks, from
 yesterday's counting file.
@@ -74,9 +74,9 @@ yesterday's counting file.
 
 ## 2. What you will be seeing in the output
 
-A sneak peek at the end of the day, with a plain-English note under each
-group of lines. If a note doesn't land yet, that's fine; the rest of the
-day builds every piece:
+Here is a sneak peek at the end of the day, with a plain-English note
+under each group of lines. If a note doesn't land yet, that's fine. The
+rest of the day builds every piece:
 
 ```text
 the orders table: 1000 rows × 4 columns (id, price, qty, name)
@@ -110,91 +110,92 @@ open columns.bin as a page file: refused, not a nanolance file: it ends with b'\
   tally: reads 1, bytes read 24, seeks 1
 ```
 
-- The first five lines — the table: a thousand orders. They are the
-  same eight orders as yesterday, repeated, each with a fresh id, so
-  every value is predictable.
+- The first five lines — the table: a thousand orders. They are
+  yesterday's eight orders, repeated, each with a fresh id, so every value
+  is predictable.
 
 - `write columns.bin` down to the first `qty of rows 10–19` — yesterday's
-  file, holding the bigger table. Asked for the total quantity, it gives
-  the right answer only when the reader is told the right row count. Told
-  "8 rows" instead, it gives 474 — a wrong answer, and no error. And ten
-  quantities cost all 4000 bytes of the quantity column.
+  file, holding the bigger table. When you ask it for the total quantity,
+  it gives the right answer only if the reader knows the right row count.
+  Tell the reader "8 rows" instead, and it gives 474: a wrong answer, and
+  no error. And ten quantities cost all 4000 bytes of the quantity column.
 
 - `write pages.bin` and the four lines under it — the new file. Each
   column is cut into 10 pages of 100 values, and each line says where
   that column's pages start in the file.
 
-- The next four lines — the same two questions, answered from the pages,
-  with the page list handed over by the code that wrote the file. Ten
-  rows now cost one read of 400 bytes.
+- The next four lines — the same two questions, answered from the pages.
+  The code that wrote the file hands over the page list. Ten rows now
+  cost one read of 400 bytes.
 
 - `open pages.bin` and its count — a reader that knows nothing starts at
-  the end of the file and reads two small pieces: the footer, then the
-  description it points to. Those 1762 bytes tell it the format version, the row
-  count, the columns, and where all 40 pages are.
+  the end of the file. It reads two small pieces: the footer, then the
+  description the footer points to. Those 1762 bytes tell it the format
+  version, the row count, the columns, and where all 40 pages are.
 
 - The two `told nothing` questions — the same answers, with no outside
-  help: the 1762 bytes of the opening, plus the pages each question needs.
+  help. Each costs the 1762 bytes of the opening, plus the pages it needs.
 
-- The last two lines — yesterday's file, opened as a new one: refused by
-  name after reading only its last 24 bytes.
+- The last two lines — yesterday's file, opened as a new one. The reader
+  refuses it by name after reading only its last 24 bytes.
 
 ## 3. Why we need it
 
 Yesterday ended with a broken line of arithmetic and a lesson: **bytes
 carry no labels.** The column file was 256 anonymous bytes, and only the
-reader's code knew what they meant. Two problems hide in that, and both
-grow with the table:
+reader's code knew what they meant. Two problems hide in that lesson,
+and both grow with the table:
 
 - **The reader must be told.** Yesterday's column reader takes the row
   count as an argument, and the column widths live in the code, not in
   the file. Hand the file to a reader with the wrong count, or to another
-  program, and nothing in the file says so.
+  program, and nothing in the file warns it.
 
 - **A column is one piece.** The column reader has one move: read the
   whole column. A question about ten rows of a million-row column
   reads a million values.
 
-You might object to the second one: every value has a fixed width, so
-value 10 of a column sits at a spot you can compute. Today, yes — but
-only while the reader knows the widths and the row count, and only while
-every value has the same width. On Day 3 the values get squeezed into
-fewer bytes, a different number of bytes per stretch of the column, and
-that arithmetic stops working. So real formats do not compute where data
-is. They **cut each column into pages and write down where every page
-is**, inside the file.
+You might object to the second problem. Every value has a fixed width, so
+value 10 of a column sits at a spot you can compute. Today, yes. But that
+works only while the reader knows the widths and the row count, and only
+while every value has the same width. On Day 3 the values get squeezed
+into fewer bytes, with a different number of bytes per stretch of the
+column, and that arithmetic stops working. So real formats do not compute
+where data is. They **cut each column into pages and write down where
+every page is**, inside the file.
 
 That raises a question of its own: where in the file does the list go?
 A writer only knows where a page landed after writing it, so the list
 can only be complete at the very end. Parquet and Lance both put it
-there, after the data — and then a reader has to find the end first.
+there, after the data. That means a reader has to find the end first.
 
 **The story so far — remember [the warehouse](story.md):** orders
 shelved two ways, in [crates](story.md#row-layout) or in
 [aisles](story.md#column-layout), a picker who fetches things and keeps
 [a tally](story.md#tally) of every trip, the manager's
 [stock count](story.md#stock-count) and a customer's
-[pickup](story.md#pickup). Today's scene is **the wall card at the back.** The week gets
-busy: a thousand orders arrive, and each aisle grows long. So the
-warehouse cuts every aisle into **sealed boxes** of 100 values. Not
-Day 1's [crates](story.md#row-layout), which held one whole order: a box
-holds 100 values of a single aisle. For each aisle the warehouse keeps a
-**box list**: where each box sits, how much it weighs, and how many values it holds. The box lists are stored in the
-warehouse after the last box, and on the back wall hangs **the wall
-card**: always the same size, always the last thing in the building, so
+[pickup](story.md#pickup). Today's scene is **the wall card at the
+back.** The week gets busy: a thousand orders arrive, and each aisle
+grows long. So the warehouse cuts every aisle into **sealed boxes** of
+100 values. These are not Day 1's [crates](story.md#row-layout), which
+held one whole order. A box holds 100 values of a single aisle. For each
+aisle the warehouse keeps a **box list**: where each box sits, how much
+it weighs, and how many values it holds. The box lists are stored in the
+warehouse after the last box. On the back wall hangs **the wall card**.
+It is always the same size and always the last thing in the building, so
 a picker who knows nothing walks straight to it. The card says where the
-box lists are, and it carries **the stamp** — the warehouse's name and
-its edition — so a picker sent to the wrong building turns around after
-reading the card on the back wall. Section A shows what the aisles cannot tell on their own, section
-B cuts them into boxes, section C writes the box lists and the card,
-and section D checks the stamp.
+box lists are. It also carries **the stamp**, the warehouse's name and
+its edition, so a picker sent to the wrong building turns around after
+reading it. Section A shows what the aisles cannot tell on their own.
+Section B cuts them into boxes, section C writes the box lists and the
+card, and section D checks the stamp.
 
 ## 4. Mental model
 
 Walk the warehouse, one station per section:
 
-- **A busy week (section A).** A thousand orders in
-  [aisles](story.md#column-layout): the quantity aisle alone is 4000
+- **A busy week (section A).** A thousand orders sit in
+  [aisles](story.md#column-layout). The quantity aisle alone is 4000
   bytes, and a picker told the wrong row count reads the wrong spot.
 
 - **[Sealed boxes](story.md#pages) (section B).** Up to 100 values per
@@ -203,19 +204,19 @@ Walk the warehouse, one station per section:
 
 - **[The box list](story.md#box-list) (sections B and C).** One line per
   box: its *offset* (the byte where it starts), its *size* in bytes, and
-  its row count. Handed over in memory in section B; stored after the
-  last box in section C.
+  its row count. In section B the writer hands it over in memory. In
+  section C it is stored after the last box.
 
 - **[The wall card at the back](story.md#wall-card) (section C).**
   Exactly 24 bytes and always last, so it starts at the file's size
   minus 24. It says where the box lists start and how long they are.
 
 - **[The stamp](story.md#stamp) (section D).** The card's last bytes,
-  `NLNC`, and its format version, `1`, checked before anything else on
-  the card is believed.
+  `NLNC`, and its format version, `1`. The picker checks them before
+  believing anything else on the card.
 
-Here is the new file, laid out from its first byte to its last (the
-numbers under it are byte positions):
+Here is the new file, laid out from its first byte to its last. The
+numbers under it are byte positions:
 
 ```text
 pages.bin
@@ -245,41 +246,43 @@ the answer             10 quantities, for 3 reads in all
 ## 5. Lance concepts introduced
 
 - **Pages.** A page is a run of one column's values, sized to be one
-  good read. Lance recommends pages of about 8 MB; ours hold 100 values
+  good read. Lance recommends pages of about 8 MB. Ours hold 100 values
   (400 to 1200 bytes) so the counts stay readable. A question reads only
-  the pages that overlap it. Parquet calls its pages *pages* too, inside
-  larger *column chunks*.
+  the pages that overlap it. Parquet calls its pages *pages* too, and
+  keeps them inside larger *column chunks*.
 
-- **Column metadata.** For each column, a description of its pages:
-  where each starts, how big it is, how many rows it holds — plus how to
-  decode the values. Lance writes this as
-  [Protocol Buffers](https://protobuf.dev/), a compact binary encoding;
-  ours is [JSON](https://docs.python.org/3.12/library/json.html) text,
+- **Column metadata.** Each column gets a description of its pages:
+  where each starts, how big it is, and how many rows it holds. It also
+  says how to decode the values. Lance writes this as
+  [Protocol Buffers](https://protobuf.dev/), a compact binary encoding.
+  Ours is [JSON](https://docs.python.org/3.12/library/json.html) text,
   so you can read it with your own eyes.
 
 - **A footer read first, from the end.** The metadata is written after
   the data, because a writer only knows where pages landed once they are
-  written — Parquet's documentation says it is "written after the data to
+  written. Parquet's documentation says it is "written after the data to
   allow for single pass writing". So the reader starts at the end. The
-  footer has a fixed size, which is what makes the end a findable place.
+  footer has a fixed size, and that is what makes the end a findable
+  place.
   Lance's footer is 40 bytes (three 8-byte offsets, two 4-byte counts,
   two 2-byte version numbers, and `LANC`: 40 bytes —
   [the public spec](https://lance.org/format/file/)); ours is 24.
 
-- **Magic numbers and format versions.** A few fixed bytes that name a format.
-  Lance's files end with `LANC`; Parquet's start *and* end with `PAR1`;
-  ours end with `NLNC`. Putting the name at the end has a bonus: a file
-  whose writing was interrupted has no ending, so it is refused instead
-  of misread. The format version lets a reader refuse a file written by a newer
-  (or older) format than it understands.
+- **Magic numbers and format versions.** A magic number is a few fixed
+  bytes that name a format. Lance's files end with `LANC`, Parquet's start
+  *and* end with `PAR1`, and ours end with `NLNC`. Putting the name at the
+  end has a bonus. A file whose writing was interrupted has no ending, so
+  the reader refuses it instead of misreading it. The format version lets
+  a reader refuse a file written by a newer (or older) format than it
+  understands.
 
 - **Where real Lance does more.** Its footer also points to a small
   table of where *each column's* metadata sits, so a reader can fetch
-  only the columns it wants; ours reads all four box lists every time.
+  only the columns it wants. Ours reads all four box lists every time.
   And instead of two exact reads for the footer and metadata, a Lance
   reader asks for one whole block from the end of the file (4 KiB on a
-  local disk, more on cloud storage), so opening a file costs one or two
-  requests — one when the metadata is small enough to arrive with the
+  local disk, more on cloud storage). So opening a file costs one or two
+  requests: one when the metadata is small enough to arrive with the
   footer.
 
 ## 6. Build it, section by section
@@ -293,7 +296,7 @@ the answer             10 quantities, for 3 reads in all
 </div>
 
 Eight orders were enough to see rows and columns. Pages need a longer
-column, so first the table grows. At the bottom of
+column, so first you grow the table. At the bottom of
 `src/nanolance/orders.py` (around line 59):
 
 ```python
@@ -310,15 +313,15 @@ def many_orders(n_rows: int) -> list[Row]:
 # ──────── new code ends here ────────
 ```
 
-- Order `k` copies the price, quantity, and name of `ORDERS[k % 8]` — the
-  remainder of `k` divided by 8, so it cycles through the eight orders —
-  and gets the id `101 + k`.
+- Order `k` copies the price, quantity, and name of `ORDERS[k % 8]`, and
+  gets the id `101 + k`. `k % 8` is the remainder of `k` divided by 8, so
+  it cycles through the eight orders.
 
 - `ORDERS[...][1:]` is that order without its id, and the `*` spreads
   those three values into the new tuple, after the new id.
 
-- The first eight are exactly `ORDERS`, so every number today can be
-  checked by hand: the quantities of eight orders add up to 65, so a
+- The first eight are exactly `ORDERS`, so you can check every number
+  today by hand. The quantities of eight orders add up to 65, so a
   thousand orders hold 125 × 65 = 8125.
 
 Now a demo that puts yesterday's column file to work on the bigger
@@ -373,8 +376,8 @@ table. In `src/nanolance/cli.py`, three edits:
    # ──────── new code ends here ────────
    ```
 
-3. In `main`, register the new subcommand and run it. Two insertions —
-   the framing lines are already in your file:
+3. In `main`, register the new subcommand and run it. There are two
+   insertions, and the framing lines are already in your file:
 
    ```python
        demo = demos.add_parser("layouts", help="store one table as rows and as columns")
@@ -396,16 +399,16 @@ table. In `src/nanolance/cli.py`, three edits:
 
 What the demo does, in order:
 
-- It prints the first three orders and a count of the rest — a thousand
+- It prints the first three orders and a count of the rest. A thousand
   lines would bury everything else.
 
 - It writes the orders with yesterday's `column_layout.write`, then asks
-  for `sum(qty)` twice: once telling the reader the true row count, once
-  telling it 8, the count that was right yesterday.
+  for `sum(qty)` twice. The first time it tells the reader the true row
+  count. The second time it says 8, the count that was right yesterday.
 
 - Last, it asks for the quantities of rows 10 to 19. The column reader
   can only read a whole column, so the demo reads it all and keeps
-  `[10:20]` — the slice from position 10 up to, not including, 20.
+  `[10:20]`: the slice from position 10 up to, but not including, 20.
 
 Run it:
 
@@ -430,38 +433,38 @@ qty of rows 10–19 from columns.bin = [40, 2, 1, 12, 4, 2, 3, 1, 40, 2]
 
 Read it line by line:
 
-- The first five lines — the table, from `many_orders(1000)`: three
-  orders printed, 997 more not.
+- The first five lines — the table, from `many_orders(1000)`. Three
+  orders are printed, and the other 997 are only counted.
 
 - `write columns.bin: 32000 bytes = …` — `column_layout.write`, unchanged
   since yesterday, laid out four [aisles](story.md#column-layout) of a
   thousand values each.
 
 - `sum(qty) from columns.bin, told 1000 rows = 8125` and its tally — the
-  [stock count](story.md#stock-count), right, for one read of the 4000
-  bytes of the quantity aisle.
+  [stock count](story.md#stock-count) is right, and it cost one read of
+  the 4000 bytes of the quantity aisle.
 
 - `sum(qty) from columns.bin, told 8 rows = 474` and its tally — the same
   file and the same function, told the wrong row count. `column_start`
-  computed where quantities would begin in an 8-row file — byte 128 —
-  and `read_column` read 32 bytes there. In this file, those bytes are
+  computed where quantities would begin in an 8-row file, byte 128, and
+  `read_column` read 32 bytes there. In this file, those bytes are
   the ids of orders 117 to 120. Each 8-byte id was read as two 4-byte
   quantities: 117 and 0, 118 and 0, 119 and 0, 120 and 0. Their sum,
   474, came back with no error at all.
 
 - `qty of rows 10–19 … = [40, 2, 1, 12, 4, 2, 3, 1, 40, 2]` and its tally
-  — the right ten values, but [the tally](story.md#tally) shows the cost:
+  — the right ten values. But [the tally](story.md#tally) shows the cost:
   4000 bytes carried for 40 bytes of answer.
 
-Two problems, both counted. Nothing in `columns.bin` records its own row
-count, and nothing lets a reader carry less than a whole aisle. The rest
-of the day fixes both.
+You have now counted both problems. Nothing in `columns.bin` records its
+own row count, and nothing lets a reader carry less than a whole aisle.
+The rest of the day fixes both.
 
-Pin the problem with tests — five edits in three files:
+Pin the problem with tests. There are five edits in three files:
 
 1. In `tests/test_orders.py`, the `from nanolance.orders import` line
-   (line 3) grows by one name, `many_orders`. Ruff's formatter splits it
-   over several lines once it is too long for one:
+   (line 3) grows by one name, `many_orders`. Once the line is too long,
+   Ruff's formatter splits it over several lines:
 
    ```python
    from nanolance.orders import (
@@ -474,8 +477,8 @@ Pin the problem with tests — five edits in three files:
    )
    ```
 
-2. In `tests/test_orders.py`, at the bottom (around line 36), a test of
-   the bigger table:
+2. In `tests/test_orders.py`, at the bottom (around line 36), add a test
+   of the bigger table:
 
    ```python
    # ──────── new code starts here (around line 36) ────────
@@ -493,8 +496,8 @@ Pin the problem with tests — five edits in three files:
    import, so it reads
    `from nanolance.orders import ORDERS, many_orders, pack_value`.
 
-4. In `tests/test_column_layout.py`, at the bottom (around line 45), a
-   test that pins the silent wrong answer:
+4. In `tests/test_column_layout.py`, at the bottom (around line 45), add
+   a test that pins the silent wrong answer:
 
    ```python
    # ──────── new code starts here (around line 45) ────────
@@ -510,9 +513,9 @@ Pin the problem with tests — five edits in three files:
    # ──────── new code ends here ────────
    ```
 
-5. In `tests/test_cli.py`, at the bottom (around line 57), a helper that
-   runs the new demo, like yesterday's `run_layouts`, and a test of its
-   lines:
+5. In `tests/test_cli.py`, at the bottom (around line 57), add a helper
+   that runs the new demo, like yesterday's `run_layouts`, and a test of
+   its lines:
 
    ```python
    # ──────── new code starts here (around line 57) ────────
@@ -552,8 +555,8 @@ uv run pytest -q
 25 passed in 0.20s
 ```
 
-Twenty-five tests: Day 1's 22, plus one for the bigger table, one for
-the wrong row count, and one for the demo.
+That makes twenty-five tests: Day 1's 22, plus one for the bigger table,
+one for the wrong row count, and one for the demo.
 
 **Section checkpoint:** `./scripts/compare.sh v1-day-02a`
 
@@ -575,9 +578,9 @@ the wrong row count, and one for the demo.
 <a href="https://docs.python.org/3.12/tutorial/introduction.html#text">negative indexes: <code>boxes[-1]</code> is the last element, <code>[-24:]</code> the last 24</a>
 </div>
 
-Start with the second problem: a column is one piece. Cut every aisle
-into boxes. Create `src/nanolance/page_file.py`, beginning with the
-page's description and the writer:
+Start with the second problem: a column is one piece. Your fix is to cut
+every aisle into boxes. Create `src/nanolance/page_file.py`, beginning
+with the page's description and the writer:
 
 ```python
 """Analogy: every aisle cut into sealed boxes — a box holds up to
@@ -631,23 +634,23 @@ def write(
 
 - `Page` holds the three facts about one box: `offset` (the byte where it
   starts), `size` (its length in bytes), and `rows` (how many values it
-  holds). `@dataclass` writes the class's `__init__` for you, plus an
-  `==` that compares field by field, which the tests use. `frozen=True`
-  forbids changing a `Page` later: a box does not move once it is
-  shelved.
+  holds). `@dataclass` writes the class's `__init__` for you. It also
+  writes an `==` that compares field by field, which the tests use.
+  `frozen=True` forbids changing a `Page` later, because a box does not
+  move once it is shelved.
 
-- `write` has the same outer loop as yesterday's `column_layout.write`
-  — one column after another — but the inner loop now steps through the
-  rows `rows_per_page` at a time: `range(0, 1000, 100)` gives 0, 100,
-  200, …, 900. Each step packs one page's values, `chunk`, into `data`.
+- `write` has the same outer loop as yesterday's `column_layout.write`:
+  one column after another. But the inner loop now steps through the rows
+  `rows_per_page` at a time, so `range(0, 1000, 100)` gives 0, 100, 200,
+  …, 900. Each step packs one page's values, `chunk`, into `data`.
 
-- Before writing a page, `out.tell()` asks the file where its bookmark is
-  — that is where the page is about to land. The writer records it,
-  with the page's size and row count, *before* writing the bytes.
+- Before writing a page, `out.tell()` asks the file where its bookmark
+  is, which is where the page is about to land. The writer records that
+  offset, with the page's size and row count, *before* writing the bytes.
 
 - `write` returns `pages`: for each column name, its list of `Page`s, in
-  file order. That return value is the box list, and today it lives in
-  the program's memory, handed from the writer to whoever called it.
+  file order. That return value is the box list. Today it lives in the
+  program's memory, and the writer hands it to whoever called it.
 
 Then the readers, below `write` in the same file:
 
@@ -695,13 +698,13 @@ def read_rows(
 
 - `read_page` is the picker carrying one box: one seek to
   `page.offset`, one read of `page.size` bytes. `codec.iter_unpack` cuts
-  those bytes into values of the codec's width, one tuple per value, and
+  those bytes into values of the codec's width, one tuple per value.
   `for (value,) in …` unpacks each one-element tuple straight into
-  `value`, as Day 1's `(value,) = …` did. Text is
-  stripped of padding and decoded, as yesterday's `unpack_value` did.
+  `value`, as Day 1's `(value,) = …` did. Text loses its padding and is
+  decoded, as in yesterday's `unpack_value`.
 
 - `read_page` takes the codec as an argument instead of looking it up in
-  `COLUMNS` by name. Today the caller passes `COLUMNS["qty"]`; in section
+  `COLUMNS` by name. Today the caller passes `COLUMNS["qty"]`. In section
   C, the codec will come from the file itself.
 
 - `read_column` carries every box of one aisle, in order, and joins their
@@ -710,9 +713,9 @@ def read_rows(
 
 - `read_rows` is the new move. It walks the box list, keeping `first`,
   the row number of the current page's first value. A page holds rows
-  `first` up to `first + page.rows`; if that range overlaps the asked-for
-  range, the page is read and the overlapping slice kept. Every other
-  page is skipped — no seek, no read.
+  `first` up to `first + page.rows`. If that range overlaps the range you
+  asked for, `read_rows` reads the page and keeps the overlapping slice.
+  It skips every other page: no seek, no read.
 
 - The slice `page_values[max(start - first, 0) : stop - first]` turns
   file-wide row numbers into positions inside the page. For rows 10 to
@@ -756,10 +759,10 @@ Now the demo. Two edits in `src/nanolance/cli.py`:
        # ──────── new code ends here ────────
    ```
 
-   The loop prints one line per column — how many pages, how big each
+   The loop prints one line per column: how many pages, how big each
    one is, and where the first two and the last begin. `box_lists["qty"]`
-   is the quantity column's list of pages, handed to the readers along
-   with the codec.
+   is the quantity column's list of pages. The demo hands it to the
+   readers along with the codec.
 
 Run it:
 
@@ -796,24 +799,24 @@ Read it line by line:
 
 - `write pages.bin: 32000 bytes, each column cut into pages` — the same
   32000 bytes as `columns.bin`. Cutting an aisle into
-  [boxes](story.md#pages) adds no bytes: a page boundary is a line on a
-  list, not something stored between the values.
+  [boxes](story.md#pages) adds no bytes, because a page boundary is a line
+  on a list, not something stored between the values.
 
 - `id: 10 pages of 800 bytes, at 0, 800, …, 7200` and the three lines
-  under it — the box list, from `write`'s return value: each column cut
-  into ten pages of 100 values, the pages of one column back to back,
-  and each column starting where the one before it ends.
+  under it — the box list, from `write`'s return value. Each column is cut
+  into ten pages of 100 values. The pages of one column sit back to back,
+  and each column starts where the one before it ends.
 
 - `sum(qty) from pages.bin = 8125` and `reads 10, bytes read 4000,
-  seeks 10` — `read_column` carried all ten quantity boxes: the same 4000
-  bytes as yesterday's single read, in ten reads now.
+  seeks 10` — `read_column` carried all ten quantity boxes. That is the
+  same 4000 bytes as yesterday's single read, now in ten reads.
 
 - `qty of rows 10–19 from pages.bin = [40, 2, 1, 12, 4, 2, 3, 1, 40, 2]`
   and `reads 1, bytes read 400, seeks 1` — the payoff. `read_rows` found
-  that rows 10 to 19 live in the first quantity page, carried that one
-  box, and skipped the other nine: 400 bytes instead of 4000.
+  that rows 10 to 19 live in the first quantity page. It carried that one
+  box and skipped the other nine: 400 bytes instead of 4000.
 
-You can confirm the "no bytes added" claim yourself — `cmp` compares two
+You can confirm the "no bytes added" claim yourself. `cmp` compares two
 files and prints nothing when they match:
 
 ```bash
@@ -825,9 +828,9 @@ identical
 ```
 
 Byte for byte, `pages.bin` is yesterday's column file. Everything new is
-in the box list — and the box list is not in the file. It exists only
-in the memory of the program that wrote the file. Close the program, and
-a reader is back to being told things from outside. Section C writes the
+in the box list, and the box list is not in the file. It exists only in
+the memory of the program that wrote the file. Close the program, and a
+reader is back to being told things from outside. Section C writes the
 list down.
 
 Pin the pages with tests. Create `tests/test_page_file.py`:
@@ -875,8 +878,8 @@ def test_reading_some_rows_reads_only_the_pages_that_hold_them(tmp_path):
 
 - `test_each_column_is_cut_into_pages` writes the eight `ORDERS` in pages
   of 3 rows, so the last page is short: 3 + 3 + 2. Its exact `Page`
-  values say the pages sit back to back, and that a page's row count is
-  recorded, not assumed.
+  values check that the pages sit back to back, and that the writer
+  records a page's row count instead of assuming it.
 
 - `test_every_column_round_trips_through_its_pages` reads all four
   columns of the thousand orders back, page by page.
@@ -907,8 +910,8 @@ def test_pages_reads_only_the_pages_it_needs(tmp_path):
 # ──────── new code ends here ────────
 ```
 
-It starts at the `id:` line rather than at `write pages.bin`, because the
-file's size changes in section C.
+The test starts at the `id:` line rather than at `write pages.bin`,
+because the file's size changes in section C.
 
 ```bash
 uv run pytest -q
@@ -919,7 +922,8 @@ uv run pytest -q
 29 passed in 0.31s
 ```
 
-Twenty-nine tests: four more, three for the pages and one for the demo.
+That makes twenty-nine tests: three more for the pages and one for the
+demo.
 
 **Section checkpoint:** `./scripts/compare.sh v1-day-02b`
 
@@ -936,13 +940,14 @@ Twenty-nine tests: four more, three for the pages and one for the demo.
 <a href="https://docs.python.org/3.12/reference/expressions.html#membership-test-operations"><code>in</code>: is this value somewhere in that list?</a>
 </div>
 
-The box list has to travel with the file. It goes after the last page —
-the writer only knows where the pages landed once they are written — and
-a fixed-size footer goes after it, so a reader can find the list from the
-end. Six edits in `src/nanolance/page_file.py`, top to bottom:
+Your box list works, but it lives only in memory. It has to travel with
+the file. It goes after the last page, because the writer only knows
+where the pages landed once they are written. A fixed-size footer goes
+after the list, so a reader can find the list from the end. Make six
+edits in `src/nanolance/page_file.py`, top to bottom:
 
-1. Replace the module docstring (lines 1–6) — the file now holds more
-   than pages:
+1. Replace the module docstring (lines 1–6), because the file now holds
+   more than pages:
 
    ```python
    """Analogy: every aisle cut into sealed boxes — a box holds up to
@@ -955,8 +960,8 @@ end. Six edits in `src/nanolance/page_file.py`, top to bottom:
    """
    ```
 
-2. Replace the imports (lines 8–13) — `json` and `asdict` are new, and
-   so is `CountingFile`, which the reader in step 6 needs:
+2. Replace the imports (lines 8–13). `json` and `asdict` are new, and so
+   is `CountingFile`, which the reader in step 6 needs:
 
    ```python
    import json
@@ -969,8 +974,8 @@ end. Six edits in `src/nanolance/page_file.py`, top to bottom:
    from nanolance.orders import COLUMNS, Row, pack_value
    ```
 
-3. Below `ROWS_PER_PAGE = 100` (around line 19), the footer's shape, its
-   magic bytes, and its format version:
+3. Below `ROWS_PER_PAGE = 100` (around line 19), add the footer's shape,
+   its magic bytes, and its format version:
 
    ```python
    # ──────── new code starts here (around line 21) ────────
@@ -989,7 +994,7 @@ end. Six edits in `src/nanolance/page_file.py`, top to bottom:
    an 8-byte whole number that is never negative, `I` a 4-byte one, and
    `4s` four raw bytes: 8 + 8 + 4 + 4 = 24 bytes, always.
 
-4. Below the `Page` class (around line 45), a class for everything a
+4. Below the `Page` class (around line 45), add a class for everything a
    reader learns from the file:
 
    ```python
@@ -1014,8 +1019,8 @@ end. Six edits in `src/nanolance/page_file.py`, top to bottom:
 
 5. In `write`, between the end of the page loop and `return pages`
    (around line 76), write the box lists and then the card. The framing
-   lines are already in your file — note the new code sits inside the
-   `with` block, one indent deeper than `return`:
+   lines are already in your file. Notice that the new code sits inside
+   the `with` block, one indent deeper than `return`:
 
    ```python
                    pages[column].append(page)
@@ -1041,8 +1046,8 @@ end. Six edits in `src/nanolance/page_file.py`, top to bottom:
        return pages
    ```
 
-6. At the bottom of the file (around line 133), the reader that opens a
-   file from its end:
+6. At the bottom of the file (around line 133), add the reader that
+   opens a file from its end:
 
    ```python
    # ──────── new code starts here (around line 133) ────────
@@ -1072,10 +1077,10 @@ end. Six edits in `src/nanolance/page_file.py`, top to bottom:
 
 What the new code does:
 
-- `metadata` is the box lists as plain Python: the row count, then for
-  each column its name, its codec's format string (`"<i"` for `qty`),
-  and its pages, each one turned into a dict by `asdict`.
-  `json.dumps` writes that as JSON text; `separators=(",", ":")` leaves
+- `metadata` is the box lists as plain Python. It holds the row count,
+  then for each column its name, its codec's format string (`"<i"` for
+  `qty`), and its pages, each one turned into a dict by `asdict`.
+  `json.dumps` writes that as JSON text. `separators=(",", ":")` leaves
   out the spaces it would otherwise add after each comma and colon.
 
 - The writer notes `metadata_offset = out.tell()` before writing the
@@ -1083,20 +1088,20 @@ What the new code does:
   card: where the metadata starts, how long it is, the format version, and the
   magic bytes.
 
-- `read_metadata` does the reverse, from the end: seek to `f.size -
-  FOOTER.size`, read the 24-byte card, unpack its four fields, then seek
-  to the metadata and read exactly `metadata_size` bytes.
+- `read_metadata` does the reverse, from the end. It seeks to `f.size -
+  FOOTER.size`, reads the 24-byte card, and unpacks its four fields. Then
+  it seeks to the metadata and reads exactly `metadata_size` bytes.
   `struct.Struct(c["format"])` rebuilds each column's codec from the
-  file, and `Page(**page)` turns each `{"offset": …, "size": …, "rows":
-  …}` dict back into a `Page` — the `**` passes the dict's entries as
+  file. `Page(**page)` turns each `{"offset": …, "size": …, "rows":
+  …}` dict back into a `Page`; the `**` passes the dict's entries as
   named arguments.
 
-- `magic` is unpacked but not checked yet. Hold that thought until
-  section D.
+- `read_metadata` unpacks `magic` but does not check it yet. Hold that
+  thought until section D.
 
-The reader needs one more fact: where the end is. Ask the file system.
-In `src/nanolance/counting.py`, in `CountingFile.__init__`, right after
-the file is opened (around line 18):
+The reader needs one more fact: where the end is. The file system can
+tell it. In `src/nanolance/counting.py`, in `CountingFile.__init__`, add
+this right after the file is opened (around line 18):
 
 ```python
         self._file = open(path, "rb")
@@ -1110,8 +1115,8 @@ Knowing the size costs no read, so the tally does not count it. (On a
 cloud store, asking for the size is a small request of its own.)
 
 Now the demo. At the end of `pages` in `src/nanolance/cli.py` (around
-line 116), three fresh `CountingFile`s: one that only opens the file,
-and two that answer the same questions as before — told nothing:
+line 116), add three fresh `CountingFile`s. One only opens the file, and
+two answer the same questions as before, told nothing:
 
 ```python
     # ──────── new code starts here (around line 116) ────────
@@ -1139,8 +1144,8 @@ and two that answer the same questions as before — told nothing:
     # ──────── new code ends here ────────
 ```
 
-Each question opens the file itself, so each tally includes the opening
-— the honest price of a reader that starts from nothing.
+Each question opens the file itself, so each tally includes the
+opening. That is the honest price of a reader that starts from nothing.
 
 Run it:
 
@@ -1182,27 +1187,27 @@ qty of rows 10–19 from pages.bin, told nothing = [40, 2, 1, 12, 4, 2, 3, 1, 40
 One line above the divider changed: `pages.bin` is now 33762 bytes, not
 32000. Read it line by line:
 
-- `write pages.bin: 33762 bytes, …` — the 32000 bytes of pages, then
-  1738 bytes of box lists, then the 24-byte card.
+- `write pages.bin: 33762 bytes, …` — the 32000 bytes of pages come
+  first, then 1738 bytes of box lists, then the 24-byte card.
 
 - `open pages.bin: version 1, 1000 rows, columns id, price, qty, name,
   40 pages` and `reads 2, bytes read 1762, seeks 2` — `read_metadata`
   walked to [the wall card](story.md#wall-card) and then to the
-  [box lists](story.md#box-list): two seeks, two reads, 24 + 1738 =
-  1762 bytes. Every fact on that line came from the file.
+  [box lists](story.md#box-list). That took two seeks and two reads, of
+  24 + 1738 = 1762 bytes. Every fact on that line came from the file.
 
 - `sum(qty) from pages.bin, told nothing = 8125` and `reads 12, bytes
-  read 5762, seeks 12` — the opening's 2 reads and 1762 bytes, then the
-  ten quantity boxes: 10 reads, 4000 bytes.
+  read 5762, seeks 12` — the opening costs 2 reads and 1762 bytes. Then
+  come the ten quantity boxes: 10 reads, 4000 bytes.
 
 - `qty of rows 10–19 …, told nothing = […]` and `reads 3, bytes read
-  2162, seeks 3` — the opening, then one box of 400 bytes. Compare it
+  2162, seeks 3` — the opening, then one box of 400 bytes. Compare that
   with section A's 4000 bytes, which also needed the row count from
   outside.
 
-The opening's 1762 bytes are large next to a 400-byte box because our
-boxes are tiny. With Lance's 8 MB pages, the metadata is a sliver of
-one page — and a reader that asks many questions opens the file once and
+The opening's 1762 bytes look large next to a 400-byte box because our
+boxes are tiny. With Lance's 8 MB pages, the metadata is a sliver of one
+page. And a reader that asks many questions opens the file once and
 keeps the metadata.
 
 <div class="callout">
@@ -1218,8 +1223,8 @@ uv run python -c "from pathlib import Path; print(Path('warehouse/pages.bin').re
 00 7d 00 00 00 00 00 00 ca 06 00 00 00 00 00 00 01 00 00 00 4e 4c 4e 43
 ```
 
-- `00 7d 00 00 00 00 00 00` — where the metadata starts. Little-endian,
-  so read the bytes backward: hex `7d00` is 32000.
+- `00 7d 00 00 00 00 00 00` — where the metadata starts. The bytes are
+  little-endian, so read them backward: hex `7d00` is 32000.
 
 - `ca 06 00 00 00 00 00 00` — its size: hex `06ca` is 1738.
 
@@ -1237,15 +1242,16 @@ uv run python -c "from pathlib import Path; print(Path('warehouse/pages.bin').re
 {"rows":1000,"columns":[{"name":"id","format":"<q","pages":[{"offset":0,"size":800,"rows":100},{"offset":800,"size":800,"rows":100},{"offset":1600,"size":800,"rows":100},
 ```
 
-The row count, then the `id` column: its format, `<q`, and its first
-three boxes — the same offsets the demo printed in section B.
+You see the row count, then the `id` column: its format, `<q`, and its
+first three boxes. They have the same offsets the demo printed in
+section B.
 
 </div>
 
-Pin the card with tests — four edits in three files:
+Pin the card with tests. There are four edits in three files:
 
-1. In `tests/test_counting.py`, at the bottom (around line 32), a test
-   of the new `size`:
+1. In `tests/test_counting.py`, at the bottom (around line 32), add a
+   test of the new `size`:
 
    ```python
    # ──────── new code starts here (around line 32) ────────
@@ -1263,8 +1269,8 @@ Pin the card with tests — four edits in three files:
 2. In `tests/test_page_file.py`, line 6: the last import line grows to
    `from nanolance.page_file import FOOTER, MAGIC, VERSION, Page`.
 
-3. In `tests/test_page_file.py`, at the bottom (around line 41), three
-   tests:
+3. In `tests/test_page_file.py`, at the bottom (around line 41), add
+   three tests:
 
    ```python
    # ──────── new code starts here (around line 41) ────────
@@ -1315,14 +1321,14 @@ Pin the card with tests — four edits in three files:
    bytes and checks that the pieces add up: metadata from byte 32000,
    then the footer, then nothing.
    `test_the_metadata_tells_a_reader_everything` pins the opening's
-   cost — two reads, two seeks, every byte after the pages — and checks
-   that what the reader learns equals what the writer recorded.
+   cost: two reads, two seeks, and every byte after the pages. It also
+   checks that what the reader learns equals what the writer recorded.
    `test_a_reader_told_nothing_reads_back_every_column` reads all four
    columns using only what the file says.
 
-4. In `tests/test_cli.py`, at the bottom (around line 96), a test of the
-   demo's new lines. The long expected line is split in two: Python
-   joins adjacent string literals into one.
+4. In `tests/test_cli.py`, at the bottom (around line 96), add a test of
+   the demo's new lines. The long expected line is split in two, and
+   Python joins adjacent string literals into one.
 
    ```python
    # ──────── new code starts here (around line 96) ────────
@@ -1355,8 +1361,8 @@ uv run pytest -q
 34 passed in 0.31s
 ```
 
-Thirty-four tests: five more — one for the file size, three for the card
-and the box lists, one for the demo.
+That makes thirty-four tests. The five new ones cover the file size
+(one), the card and the box lists (three), and the demo (one).
 
 **Section checkpoint:** `./scripts/compare.sh v1-day-02c`
 
@@ -1370,9 +1376,9 @@ and the box lists, one for the demo.
 <a href="https://docs.python.org/3.12/reference/lexical_analysis.html#reserved-classes-of-identifiers"><code>_</code>: a name for a value you will not use</a>
 </div>
 
-Your reader trusts the last 24 bytes of any file it is given. So give it
-the wrong file — yesterday's `columns.bin`, still sitting in
-`warehouse/`:
+Your reader now opens a file with no outside help. But it trusts the
+last 24 bytes of any file it is given. So give it the wrong file:
+yesterday's `columns.bin`, still sitting in `warehouse/`:
 
 ```bash
 uv run python -c "from pathlib import Path; from nanolance import page_file; from nanolance.counting import CountingFile; page_file.read_metadata(CountingFile(Path('warehouse/columns.bin')))"
@@ -1393,14 +1399,14 @@ MemoryError
 (Paths shortened, as everywhere in this book.) The last 24 bytes of
 `columns.bin` are the names `gloves` and `padlock` with their padding.
 Read as a card, those letters say the metadata is about
-7,810,474,787,431,514,112 bytes long — and `read` tried to make room for
+7,810,474,787,431,514,112 bytes long, and `read` tried to make room for
 that many. Python ran out of memory before it ran out of trust. A
-smaller accident is worse: a few plausible-looking numbers, and the
+smaller accident is worse. With a few plausible-looking numbers, the
 reader carries back garbage without a word, like section A's 474.
 
 The fix is to check the card before believing it. In
-`src/nanolance/page_file.py`, replace the whole `read_metadata` function
-— lines 135 to the end of the file — with this one. The docstring gains
+`src/nanolance/page_file.py`, replace the whole `read_metadata` function,
+from line 135 to the end of the file, with this one. The docstring gains
 a sentence, and four checks arrive around the first read:
 
 ```python
@@ -1445,16 +1451,16 @@ def read_metadata(f: CountingFile) -> Metadata:
 ```
 
 - **Too short.** A file smaller than the card cannot hold one. This check
-  comes before any seek, because `f.size - FOOTER.size` would be
+  comes before any seek, because otherwise `f.size - FOOTER.size` would be
   negative.
 
 - **The wrong name.** If the last four bytes are not `NLNC`, this is not
-  our file — whatever it is, it is refused by name. A file whose writer
-  was interrupted also lands here: its last bytes are page data, because
-  the card is the last thing written.
+  our file. Whatever it is, the reader refuses it by name. A file whose
+  writer was interrupted also lands here. Its last bytes are page data,
+  because the card is the last thing written.
 
-- **The wrong format version.** Our file, but written by a format version this
-  reader does not know. Refusing is safer than guessing.
+- **The wrong format version.** The file is ours, but written by a format
+  version this reader does not know. Refusing is safer than guessing.
 
 - **A card that points outside the file.** The metadata must end before
   the footer starts. This catches a damaged card before the reader tries
@@ -1465,7 +1471,7 @@ Each error is a `ValueError` whose message says which check failed.
 unprintable byte shows as `\x00` instead of vanishing.
 
 At the end of `pages` in `src/nanolance/cli.py` (around line 138), open
-yesterday's file as a page file — and catch the refusal:
+yesterday's file as a page file, and catch the refusal:
 
 ```python
     # ──────── new code starts here (around line 138) ────────
@@ -1479,7 +1485,7 @@ yesterday's file as a page file — and catch the refusal:
 ```
 
 If `read_metadata` raises a `ValueError`, the `except` block runs and
-prints its message; the demo carries on to print the tally either way.
+prints its message. Either way, the demo carries on to print the tally.
 
 Run it:
 
@@ -1498,15 +1504,15 @@ Read it line by line:
 
 - `open columns.bin as a page file: refused, not a nanolance file: it
   ends with b'\x00\x00\x00\x00', not b'NLNC'` — [the stamp](story.md#stamp)
-  check. The last four bytes of `columns.bin` are padding after
-  `padlock`, four zero bytes, and they are not `NLNC`.
+  check. The last four bytes of `columns.bin` are the padding after
+  `padlock`: four zero bytes, not `NLNC`.
 
-- `reads 1, bytes read 24, seeks 1` — refused after one read of the card,
-  before the reader carried anything else.
+- `reads 1, bytes read 24, seeks 1` — the reader refused the file after
+  one read of the card, before it carried anything else.
 
-Pin every refusal — three edits in two files:
+Pin every refusal. There are three edits in two files:
 
-1. In `tests/test_page_file.py`, lines 1–6: the imports gain `pytest`
+1. In `tests/test_page_file.py`, lines 1–6, the imports gain `pytest`
    and `column_layout`:
 
    ```python
@@ -1518,8 +1524,8 @@ Pin every refusal — three edits in two files:
    from nanolance.page_file import FOOTER, MAGIC, VERSION, Page
    ```
 
-2. In `tests/test_page_file.py`, at the bottom (around line 81), a small
-   helper and five tests:
+2. In `tests/test_page_file.py`, at the bottom (around line 81), add a
+   small helper and five tests:
 
    ```python
    # ──────── new code starts here (around line 81) ────────
@@ -1577,17 +1583,17 @@ Pin every refusal — three edits in two files:
 
    `test_a_day_1_column_file_is_refused_by_name` gets the same refusal
    the demo shows. `test_a_file_cut_short_by_an_interrupted_write_is_refused`
-   keeps only the first 32000 bytes — every page, no box lists, no card
-   — as if the writer had stopped there.
+   keeps only the first 32000 bytes: every page, but no box lists and no
+   card, as if the writer had stopped there.
    `test_a_file_shorter_than_the_footer_is_refused_without_a_read` gives
-   the reader four bytes that do spell `NLNC`; the size check refuses
-   them before a single seek. The last two rewrite a good file's card —
-   once with format version 2, once pointing a million bytes past the end
-   — and expect each refusal by its message; `_` names the footer fields
-   they do not need.
+   the reader four bytes that do spell `NLNC`. The size check refuses
+   them before a single seek. The last two tests rewrite a good file's
+   card, once with format version 2 and once pointing a million bytes
+   past the end. Each expects its refusal by its message. `_` names the
+   footer fields they do not need.
 
-3. In `tests/test_cli.py`, at the bottom (around line 113), a test of
-   the refusal line. The `r` before the second string keeps `\x00` as
+3. In `tests/test_cli.py`, at the bottom (around line 113), add a test
+   of the refusal line. The `r` before the second string keeps `\x00` as
    the four characters the demo prints, instead of turning it into a
    zero byte.
 
@@ -1614,9 +1620,9 @@ uv run pytest -q
 40 passed in 0.37s
 ```
 
-Forty tests: six more — five refusals and one for the demo.
+That makes forty tests: five more for the refusals and one for the demo.
 
-**Section checkpoint:** `./scripts/compare.sh v1-day-02d` — which is
+**Section checkpoint:** `./scripts/compare.sh v1-day-02d`. This one is
 also the finished day.
 
 ## 7. Run it
@@ -1665,31 +1671,32 @@ The whole day in the warehouse, one stretch at a time:
   and over. (`many_orders`, printed by `pages`.)
 
 - `write columns.bin` through the first `qty of rows 10–19` — yesterday's
-  aisles: right when told the right count, confidently wrong when told
-  the wrong one, and a whole aisle carried for ten values.
+  aisles. They are right when told the right count and confidently wrong
+  when told the wrong one, and they carry a whole aisle for ten values.
   (`column_layout`, unchanged.)
 
 - `write pages.bin` through the second `qty of rows 10–19` — every aisle
-  cut into sealed boxes, with a box list handed over by the writer: ten
+  is cut into sealed boxes, and the writer hands over a box list. Ten
   values now cost one box. (`page_file.write`, `read_column`,
   `read_rows`.)
 
 - `open pages.bin` through the `told nothing` lines — the box lists and
-  the wall card, stored in the file: a picker who knows nothing reads
+  the wall card are stored in the file. A picker who knows nothing reads
   the card, then the lists, then only the boxes it needs.
   (`read_metadata`, then the same readers.)
 
-- The last two lines — the stamp checked: a stranger's file turned away
+- The last two lines — the stamp check turns a stranger's file away
   after one 24-byte read. (`read_metadata`'s checks.)
 
-Nothing here varies between runs: no randomness, no timing, only counts.
+Nothing here varies between runs. There is no randomness and no timing,
+only counts.
 
 ## 9. Test it
 
-Forty tests now pin the day — Day 1's 22, plus 18 new ones: the bigger
-table and what Day 1's file cannot say (section A, 3 tests), the pages
-(section B, 4), the box lists and the card (section C, 5), and the
-refusals (section D, 6). Thirty-one are unit tests; the other nine
+Forty tests now pin the day: Day 1's 22, plus 18 new ones. They cover the
+bigger table and what Day 1's file cannot say (section A, 3 tests), the
+pages (section B, 4), the box lists and the card (section C, 5), and the
+refusals (section D, 6). Thirty-one are unit tests. The other nine
 (`test_cli_says_hello` and the eight in `test_cli.py`) run the real
 command line.
 
@@ -1707,8 +1714,8 @@ and seeks, and every refusal is pinned by its message.
 
 ## 10. Break it deliberately
 
-Make the writer note where each box *ends* instead of where it begins.
-In `write` in `src/nanolance/page_file.py`, change one line:
+Now make the writer note where each box *ends* instead of where it
+begins. In `write` in `src/nanolance/page_file.py`, change one line:
 
 ```diff
 @@ src/nanolance/page_file.py, around line 72 @@
@@ -1719,7 +1726,8 @@ In `write` in `src/nanolance/page_file.py`, change one line:
 ```
 
 Every page's bytes still land in exactly the same place. Only the box
-list lies: each entry points one box further along. Run the page tests:
+list lies, because each entry points one box further along. Run the page
+tests:
 
 ```bash
 uv run pytest -q --tb=line tests/test_page_file.py
@@ -1732,28 +1740,28 @@ E   assert [4, 2, 3, 1, 40, 2, ...] == [40, 2, 1, 12, 4, 2, ...]
 E   assert [201, 202, 20...205, 206, ...] == [101, 102, 10...105, 106, ...]
 ```
 
-(Only the `E` lines are shown — one per failing test. Pytest's summary
+(Only the `E` lines are shown, one per failing test. Pytest's summary
 line reads `4 failed, 7 passed`.)
 
 Read it line by line:
 
 - `[Page(offset=...)] == [Page(offset=...)]` — the exact-pages test sees
-  it directly: the first page now claims to start at byte 24, where the
-  second one starts.
+  the lie directly. The first page now claims to start at byte 24, where
+  the second one starts.
 
-- `[201, 202, …] == [101, 102, …]` (twice) — reading the id column back,
-  the first box on the list is really the second box, rows 100 to 199,
-  so every id comes back 100 too high.
+- `[201, 202, …] == [101, 102, …]` (twice) — when reading the id column
+  back, the first box on the list is really the second box, rows 100 to
+  199. So every id comes back 100 too high.
 
 - `[4, 2, 3, 1, 40, 2, …] == [40, 2, 1, 12, 4, 2, …]` — rows 10 to 19,
-  read from the box the list names, are really rows 110 to 119: real
-  quantities, wrong rows, no error.
+  read from the box the list names, are really rows 110 to 119. They are
+  real quantities from the wrong rows, with no error.
 
 - The seven tests that pass are the instructive part. The card is
-  perfect: it points at the box lists, the stamp is right, the format version
-  is right, so every refusal test still passes. And the box lists the
-  reader loads equal the ones the writer recorded — both wrong in the
-  same way.
+  perfect. It points at the box lists, and the stamp and the format
+  version are right, so every refusal test still passes. And the box
+  lists the reader loads equal the ones the writer recorded, because both
+  are wrong in the same way.
 
 The demo shows how far the lie travels:
 
@@ -1781,18 +1789,18 @@ open columns.bin as a page file: refused, not a nanolance file: it ends with b'\
   tally: reads 1, bytes read 24, seeks 1
 ```
 
-(The first twelve lines — section A's, which never touch `pages.bin` —
-are left out.) The sum is 69666604232: the last quantity box on the list
-points at byte 20000, which is where the name column begins, so its
+(The first twelve lines are left out. They are section A's, which never
+touch `pages.bin`.) The sum is 69666604232. The last quantity box on the
+list points at byte 20000, where the name column begins, so its
 "quantities" are letters read as numbers. The last name box on the list
-points at byte 32000 — the box lists themselves — so its first four
-"names" are 12-byte slices of the metadata's own JSON text, starting
-`'{"rows":1000'`. (The file is also 4 bytes longer, 33766: the larger
-offsets take more digits to write.)
+points at byte 32000, where the box lists themselves begin. So its first
+four "names" are 12-byte slices of the metadata's own JSON text, starting
+`'{"rows":1000'`. (The file is also 4 bytes longer, 33766, because the
+larger offsets take more digits to write.)
 
 The lesson: **the stamp proves whose file this is; it does not prove the
 box lists are true.** A reader has no way to check where a box really
-starts — the list is the only map. That is why `write` records
+starts, because the list is the only map. That is why `write` records
 `out.tell()` *before* writing each page, and why the exact-pages test
 exists.
 
@@ -1800,8 +1808,8 @@ Put the line back and confirm `uv run pytest -q` is green again.
 
 ## 11. Checkpoint
 
-Every checkpoint — each section and the day — is done only when the full
-green bar passes:
+Every checkpoint, each section and the day alike, is done only when the
+full green bar passes:
 
 ```bash
 ./scripts/check.sh
@@ -1829,20 +1837,20 @@ Read it line by line:
   formatting and lint gates, now over today's new files and this
   chapter's Python blocks too.
 
-- the dots and `40 passed` — the whole suite, as in section 9.
+- The dots and `40 passed` — the whole suite, as in section 9.
 
 - `nanolance 0.1.0: scaffold is alive` — the Day 0 smoke command.
 
-- the two `⋮` lines — the smoke gate's two demos, `nanolance layouts`
-  (Day 1's 23 lines) and the new `nanolance pages` (the 29 lines of
-  section 8), shortened here.
+- The two `⋮` lines — the smoke gate's two demos, shortened here:
+  `nanolance layouts` (Day 1's 23 lines) and the new `nanolance pages`
+  (the 29 lines of section 8).
 
-- the three `INFO` lines and `GREEN: all gates passed` — the book built,
+- The three `INFO` lines and `GREEN: all gates passed` — the book built,
   and every gate passed.
 
 The smoke gate gained one line today: `uv run --locked nanolance pages
 "$scratch"`. `scripts/check.sh` is course infrastructure, outside what
-`compare.sh` checks; to pick up today's copy, take it from the
+`compare.sh` checks. To pick up today's copy, take it from the
 checkpoint:
 
 ```bash
@@ -1852,7 +1860,7 @@ git checkout v1-day-02 -- scripts/check.sh
 Then close out the day in whichever mode you are following:
 
 **Built along on your own branch?** Confirm your code matches the finished
-day — the final ✓ line means it does:
+day. The final ✓ line means it does:
 
 ```bash
 ./scripts/compare.sh v1-day-02
@@ -1867,7 +1875,7 @@ uv run nanolance pages
 git switch -          # back to where you were
 ```
 
-**Either way**, today's complete change set — docs included — reads as one
+**Either way**, today's complete change set, docs included, reads as one
 diff:
 
 ```bash
@@ -1876,29 +1884,30 @@ git diff v1-day-01 v1-day-02
 
 ## 12. Recap
 
-**What changed today:** the project gained `many_orders`, a thousand
-predictable orders; a page file, `page_file`, whose `write` cuts each
+**What changed today:** you added `many_orders`, a thousand predictable
+orders. You built a page file, `page_file`, whose `write` cuts each
 column into pages of up to 100 values and records each one as a `Page`
-(offset, size, rows); `read_page`, `read_column`, and `read_rows`, which
-read only the pages a question needs; the column metadata, written as
-JSON after the pages, and a 24-byte `FOOTER` after that, carrying the
-metadata's position, the format `VERSION`, and the `MAGIC` bytes `NLNC`;
-`read_metadata`, which opens a file from its end and refuses a file that
-is too short, not ours, of another format version, or pointing outside itself;
-`CountingFile.size`; and a `nanolance pages` demo that counts every step.
-Eighteen new tests (40 in all) pin it across four section checkpoints
-(`v1-day-02a` to `v1-day-02d`), still with no dependencies.
+(offset, size, rows). `read_page`, `read_column`, and `read_rows` read
+only the pages a question needs. The column metadata is written as JSON
+after the pages, and a 24-byte `FOOTER` follows it, carrying the
+metadata's position, the format `VERSION`, and the `MAGIC` bytes `NLNC`.
+`read_metadata` opens a file from its end. It refuses a file that is too
+short, not ours, of another format version, or pointing outside itself.
+You also added `CountingFile.size`, and a `nanolance pages` demo that
+counts every step. Eighteen new tests (40 in all) pin it across four
+section checkpoints (`v1-day-02a` to `v1-day-02d`), still with no
+dependencies.
 
-**Deliberately naive:** pages hold a fixed number of rows; opening a
+**Deliberately naive:** pages hold a fixed number of rows. Opening a
 file reads every column's box list, in two separate reads (§5's "Where
-real Lance does more" says how Lance does better); and the box list is
-trusted completely — section 10 showed what that costs.
+real Lance does more" says how Lance does better). And the reader trusts
+the box list completely; section 10 showed what that costs.
 
-**Tomorrow, on Day 3:** every value still takes its full fixed width —
-a quantity of 3 spends four bytes, and `tape` drags eight bytes of
+**Tomorrow, on Day 3:** every value still takes its full fixed width. A
+quantity of 3 spends four bytes, and `tape` drags eight bytes of
 padding. Day 3 packs the boxes tighter: the same values in fewer bytes,
 with dictionaries, runs, and packed bits, each proven to give back
 exactly what went in. Then a page's size can no longer be computed from
 its row count, and you will see why the box list had to record each
 box's size rather than work it out. The warehouse now describes itself
-— see [the warehouse](story.md); next, it learns to pack.
+(see [the warehouse](story.md)). Next, it learns to pack.

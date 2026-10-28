@@ -45,19 +45,18 @@ dependencies**: `itertools` and `collections` come with Python.
 ## 1. What you will have running
 
 By the end of today, `uv run nanolance packing` stores the same thousand
-orders as yesterday in **fewer bytes** — and proves that every value
-comes back exactly. Yesterday's pages give every value its full fixed
-width: a quantity of 3 takes four bytes, and a page of a hundred item
-names holds the same eight names over and over, each one padded to 12
-bytes. Today each page can be stored in one of four **encodings** —
-plain (yesterday's way), dictionary, run-length, or bit-packed — and
-records which one, so a reader decodes it correctly.
+orders as yesterday in **fewer bytes**, and proves that every value comes
+back exactly. Yesterday's pages give every value its full fixed width. A
+quantity of 3 takes four bytes, and a page of a hundred item names holds
+the same eight names over and over, each one padded to 12 bytes. Today
+each page can be stored in one of four **encodings**: plain (yesterday's
+way), dictionary, run-length, or bit-packed. Each page records which one
+it uses, so a reader decodes it correctly.
 
-The demo prints, for every column, the bytes each encoding would take —
-including the cases where an encoding makes a page *bigger* — and then
-lets each page pick its smallest. Last, it asks yesterday's two
-questions again and counts what fewer bytes on disk buys: fewer bytes
-read.
+For every column, the demo prints the bytes each encoding would take,
+including the cases where an encoding makes a page *bigger*. Then it lets
+each page pick its smallest. Last, it asks yesterday's two questions
+again and counts what fewer bytes on disk buys you: fewer bytes read.
 
 <div class="dl-concepts"><span>Lance concepts used here:</span>
 <a href="https://lance.org/format/file/encoding/">Lance's encoding strategy: dictionary, run-length, bitpacking, and more ↗</a>
@@ -68,9 +67,9 @@ read.
 
 ## 2. What you will be seeing in the output
 
-A sneak peek at the end of the day — a few lines of it; section 8 has
-all of it. If a note doesn't land yet, that's fine; the rest of the day
-builds every piece:
+Here is a sneak peek at a few lines from the end of the day; section 8
+has all of them. If a note doesn't land yet, that's fine. The rest of the
+day builds every piece:
 
 ```text
 every column packed every way, orders as placed (bytes, all pages):
@@ -90,37 +89,38 @@ sum(qty) from smallest.bin, told nothing = 8125
 ```
 
 - `every column packed every way` and the four lines under it — each
-  column stored each of the four ways, in bytes. Names shrink from 12000
-  bytes to 2000 with a dictionary; quantities from 4000 to 760 when
-  bit-packed. Some ways make things worse: run-length *grows* every
+  column stored each of the four ways, in bytes. A dictionary shrinks the
+  names from 12000 bytes to 2000. Bit-packing shrinks the quantities from
+  4000 to 760. Some ways make things worse: run-length *grows* every
   column here, and `—` means a way cannot store that kind of value.
 
 - `write smallest.bin` and `chosen:` — a file where each page picked its
-  own smallest way: 5652 bytes of pages instead of 32000.
+  own smallest way. It holds 5652 bytes of pages instead of 32000.
 
 - The last four lines — yesterday's first question, adding up every
-  quantity, asked of a plain file and of the smallest one. The same
-  answer, for 760 bytes of pages instead of 4000.
+  quantity, asked of a plain file and of the smallest one. You get the
+  same answer for 760 bytes of pages instead of 4000.
 
 ## 3. Why we need it
 
 A quantity of 3 takes four bytes. A page of names spends 1200 bytes
 saying eight names. That is yesterday's file: every value at its full
-fixed width, as yesterday's recap promised we would fix. The largest
+fixed width, which yesterday's recap promised we would fix. The largest
 quantity, 40, fits in 6 bits and is stored in 32. The table is small and
-predictable on purpose, but real columns look like this too: a status
-with five possible values, a country code, a timestamp that grows
-slowly, a label column sorted by label.
+predictable on purpose, but real columns look like this too. Think of a
+status with five possible values, a country code, a timestamp that grows
+slowly, or a label column sorted by label.
 
-Fewer bytes matter twice. They are less to store, and — the part this
-course measures — less to *read*. Every byte a page does not hold is a
-byte no question ever has to read.
+Fewer bytes matter twice. They are less to store, and they are less to
+*read*, which is the part this course measures. Every byte a page does
+not hold is a byte no question ever has to read.
 
-But encoding a page raises two questions the rest of the day answers:
+But encoding a page raises two questions, and the rest of the day
+answers them:
 
 - **How does a reader know how a page was encoded?** Different pages
   may be stored differently, so the file has to say which way each page
-  went — and that changes the format.
+  went. That changes the format.
 
 - **How do you know nothing was lost?** An encoded page is only useful
   if decoding it gives back exactly the bytes that went in. Every
@@ -132,51 +132,52 @@ sit in [aisles](story.md#column-layout) cut into
 [the wall card](story.md#wall-card) at the back tell a picker who knows
 nothing where every box is, and [the tally](story.md#tally) counts every
 trip. Today's scene is **the packer's bench**. The picker carries boxes
-*out* to answer questions; **the packer** is the one who fills them in
-the first place — until today by Day 1's
-[packing rule](story.md#packing-rule), every value in a full-size
+*out* to answer questions. **The packer** is the one who fills them in
+the first place. Until today, the packer followed Day 1's
+[packing rule](story.md#packing-rule): every value in a full-size
 compartment. Today the packer learns new ways to pack a box, notes on the
 box list how each box was packed, and weighs every packing to keep the
-lightest. Section A looks inside the boxes; B, C, and D each bring one
-new way of packing.
+lightest. Section A looks inside the boxes, and sections B, C, and D each
+bring one new way of packing.
 
 ## 4. Mental model
 
 Walk the packer's bench, one station per section:
 
-- **Looking inside (section A).** The first box of each aisle, counted:
-  how many different values, the longest run of equal neighbors, and how
-  many bits the largest whole number needs. Every count says the box is
-  emptier than its bytes.
+- **Looking inside (section A).** The packer counts the first box of
+  each aisle: how many different values, the longest run of equal
+  neighbors, and how many bits the largest whole number needs. Every
+  count says the box is emptier than its bytes.
 
 - **[The lid legend](story.md#lid-legend) (section B)** — dictionary
-  encoding. A box of 100 names, 8 of them different: the 8 names once on
-  the lid (96 bytes), a count, and 100 one-byte legend numbers inside.
-  200 bytes instead of 1200.
+  encoding. Take a box of 100 names, 8 of them different. The 8 names go
+  once on the lid (96 bytes), with a count, and 100 one-byte legend
+  numbers go inside. That is 200 bytes instead of 1200.
 
 - **[The packing note](story.md#packing-note) (section B)** — each
   page's encoding, recorded. Each box's line on the box list now says
-  how the box was packed. That is a new edition of the format, so the
+  how the box was packed. That makes a new edition of the format, so the
   stamp's version goes from 1 to 2.
 
 - **[Stacks](story.md#stacks) (section C)** — run-length encoding. A box
-  of 100 identical names: one name and a count of 100. A box where no
-  two neighbors match: every name gets a count of 1, and the box doubles.
+  of 100 identical names becomes one name and a count of 100. In a box
+  where no two neighbors match, every name gets a count of 1, and the box
+  doubles.
 
 - **[Snug compartments](story.md#snug-compartments) (section D)** —
-  bit-packing. A box of quantities whose largest is 40: every quantity
-  in 6 bits instead of 32.
+  bit-packing. In a box of quantities whose largest is 40, every quantity
+  fits in 6 bits instead of 32.
 
 - **[The weigh-in](story.md#weigh-in) (section D)** — the smallest
   encoding per page. The packer packs each box all four ways, weighs
   each packing, and keeps the lightest. `"smallest"` is not a fifth
-  encoding: it is an instruction to the writer to run the weigh-in for
-  every page of a column and record whichever encoding won, so pages of
-  one column can be encoded differently.
+  encoding. It tells the writer to run the weigh-in for every page of a
+  column and record whichever encoding won. So pages of one column can be
+  encoded differently.
 
-Here is one box — the first 100 quantities, as placed — encoded each of
-the four ways (every number is a byte count you will see the code
-produce):
+Here is one box, the first 100 quantities as placed, encoded each of
+the four ways. Every number is a byte count you will see the code
+produce:
 
 ```text
 plain        100 values × 4 bytes                         = 400 bytes
@@ -204,46 +205,48 @@ the plain box          400 bytes: 100 quantities at 4 bytes each, exactly as wri
 the answer             100 quantities, for 76 bytes read instead of 400
 ```
 
-The decode step is the only new one: everything after it is yesterday's
+The decode step is the only new one. Everything after it is yesterday's
 reader, unchanged.
 
 ## 5. Lance concepts introduced
 
 - **Encodings.** An encoding is a reversible way to store a run of
   values in other bytes. Lance's documentation draws the same line we
-  draw today: the *data type* says what the values mean, the *encoding*
-  says how they sit in bytes — "An integer array might be encoded into
-  two completely different layouts which represent the same data." Our
-  encoders never look at what a value means; they see fixed-width pieces
-  of bytes, except bit-packing, which needs whole numbers.
+  draw today. The *data type* says what the values mean, and the
+  *encoding* says how they sit in bytes: "An integer array might be
+  encoded into two completely different layouts which represent the same
+  data." Our encoders never look at what a value means. They see
+  fixed-width pieces of bytes. The one exception is bit-packing, which
+  needs whole numbers.
 
 - **Plain is the fallback.** Parquet's documentation calls plain the
   encoding that "is used whenever a more efficient encoding cannot be
-  used." Ours too: a column nobody asks to encode stays plain, and a
-  tie goes to plain.
+  used." The same holds for ours. A column nobody asks to encode stays
+  plain, and a tie goes to plain.
 
 - **Each page records its encoding — and the format version moves.**
   Encodings are chosen per page, so the column metadata says, for every
-  page, how to decode it; Lance's docs note that "the encoding strategy
+  page, how to decode it. Lance's docs note that "the encoding strategy
   tends to evolve more quickly than the file format itself." Recording
-  it changes what a file means, so the version goes up. Our reader reads
-  both versions; a reader that only knows version 1 refuses a version 2
-  file instead of misreading it. Section B runs both directions.
+  the encoding changes what a file means, so the version goes up. Our
+  reader reads both versions. A reader that only knows version 1 refuses
+  a version 2 file instead of misreading it. Section B runs both
+  directions.
 
 <div class="callout">
 
-**Where real Lance does more.** Many more encodings — FSST for strings,
-byte-stream-split and ALP for floats, delta and constant pages — and
-general compression (LZ4, zstd) that "is applied on top of other
-encoding techniques (RLE, BSS, bitpacking, etc.)". In Parquet, a
+**Where real Lance does more.** It has many more encodings: FSST for
+strings, byte-stream-split and ALP for floats, delta and constant pages.
+It also has general compression (LZ4, zstd) that "is applied on top of
+other encoding techniques (RLE, BSS, bitpacking, etc.)". In Parquet, a
 dictionary's codes are themselves stored with run-length/bit-packing.
-And no trying of everything: Lance decides from cheap statistics. It
+And Lance does not try everything. It decides from cheap statistics. It
 applies run-length encoding "if the number of runs is less than half the
-number of values", and a dictionary only when the distinct values fit a
-budget (by default half the number of values) and the estimated result
+number of values". It uses a dictionary only when the distinct values fit
+a budget (by default half the number of values) and the estimated result
 is under 80% of plain. When used in a mini-block context, its
 bit-packing works on blocks of 1024 values with the bit width stored
-inline in each block — like our one-byte width at the start of a page.
+inline in each block, like our one-byte width at the start of a page.
 All of it is in the [encoding strategy](https://lance.org/format/file/encoding/)
 page.
 
@@ -263,8 +266,8 @@ page.
 </div>
 
 Before encoding anything, count what the boxes hold. You need a small
-measuring function and a new demo. In `src/nanolance/cli.py`, five
-edits:
+measuring function and a new demo. Make five edits in
+`src/nanolance/cli.py`:
 
 1. Below `import argparse` (line 3), add
 
@@ -278,7 +281,7 @@ edits:
    from nanolance.page_file import ROWS_PER_PAGE
    ```
 
-3. Between the end of `pages` and `def main` (around line 147), the
+3. Between the end of `pages` and `def main` (around line 147), add the
    measuring function and the demo:
 
    ```python
@@ -337,7 +340,7 @@ edits:
        args = parser.parse_args()
    ```
 
-5. And run it, after the `pages` branch (around line 203):
+5. Then run it, after the `pages` branch (around line 203):
 
    ```python
        elif args.demo == "pages":
@@ -351,15 +354,15 @@ edits:
 
 What the new code does:
 
-- `describe` measures one page three ways: `groupby` groups runs of
-  equal neighbors (`[2, 2, 5]` is a run of two 2s, then one 5), a `set`
-  keeps each value once, and `bit_length()` says how many bits a whole
-  number needs — 40 is `101000`, so 6.
+- `describe` measures one page three ways. `groupby` groups runs of
+  equal neighbors (`[2, 2, 5]` is a run of two 2s, then one 5). A `set`
+  keeps each value once. And `bit_length()` says how many bits a whole
+  number needs: 40 is `101000`, so 6.
 
-- `packing` describes the first page of every column twice: for the
-  thousand orders, and for the same orders sorted by name
+- `packing` describes the first page of every column twice: once for the
+  thousand orders, and once for the same orders sorted by name
   (`key=lambda row: row[3]`). "Plain" is today's name for yesterday's
-  way of storing a page: every value at its column's full width.
+  way of storing a page, with every value at its column's full width.
 
 Run it:
 
@@ -383,37 +386,38 @@ the first page of each column, orders sorted by name:
 
 Read it line by line:
 
-- `the orders table: … 100 rows per page` — the header from `packing`:
-  yesterday's thousand orders, in [boxes](story.md#pages) of 100.
+- `the orders table: … 100 rows per page` — the header from `packing`.
+  These are yesterday's thousand orders, in [boxes](story.md#pages) of
+  100.
 
 - `id: 800 bytes plain — 100 distinct, longest run 1, largest 200 needs
   8 bits` — `describe` on the first id page. Every id is different, so
-  there is nothing to share; but the largest, 200, needs 8 bits, and
+  there is nothing to share. But the largest, 200, needs 8 bits, and
   each id spends 64.
 
-- `price: 800 bytes plain — 8 distinct` — a hundred prices, only 8
-  different ones. `describe` prints no bit count for prices: they are
-  not whole numbers.
+- `price: 800 bytes plain — 8 distinct` — a hundred prices, but only 8
+  different ones. `describe` prints no bit count for prices, because they
+  are not whole numbers.
 
 - `qty: 400 bytes plain — 6 distinct, …, largest 40 needs 6 bits` — six
-  different quantities (two of the eight orders share a quantity of 1,
-  and two share 2), and none needs more than 6 of its 32 bits.
+  different quantities, because two of the eight orders share a quantity
+  of 1 and two share 2. None needs more than 6 of its 32 bits.
 
 - `name: 1200 bytes plain — 8 distinct, longest run 1` — eight names,
   said a hundred times. Written once each, they would take 8 × 12 = 96
   bytes.
 
 - The five lines for the orders sorted by name — the first page now
-  holds only `bolts` orders: one price, one quantity, one name, each
-  repeated 100 times in a single run. The ids stay all different, every
+  holds only `bolts` orders. One price, one quantity, and one name each
+  repeat 100 times in a single run. The ids stay all different: every
   eighth id from 101 up to 893.
 
 Every line says the same thing: the box is much emptier than its bytes.
-Sections B to D each turn one of these counts into saved bytes — the
+Sections B to D each turn one of these counts into saved bytes: the
 distinct values, the runs, and the bits.
 
 Pin the demo with a test. At the bottom of `tests/test_cli.py` (around
-line 119), a helper that runs the new demo and a test of its first
+line 119), add a helper that runs the new demo and a test of its first
 eleven lines:
 
 ```python
@@ -459,7 +463,7 @@ uv run pytest -q
 41 passed in 0.36s
 ```
 
-Forty-one tests: yesterday's 40 and the new one.
+That makes forty-one tests: yesterday's 40 and the new one.
 
 **Section checkpoint:** `./scripts/compare.sh v1-day-03a`
 
@@ -484,13 +488,13 @@ Forty-one tests: yesterday's 40 and the new one.
 
 Start with the name column: eight names said a hundred times. A
 dictionary stores each distinct value once and replaces every value with
-a small code — its position in that list. Today's codes are one byte
+a small code, its position in that list. Today's codes are one byte
 each, so a page may hold up to 256 distinct values.
 
-Every [encoding](story.md#encodings) needs two halves: an **encoder**,
-which turns a page's plain bytes into stored bytes, and a **decoder**,
-which turns them back. Create `src/nanolance/encodings.py`, beginning
-with the plain encoding, which is yesterday's way given a name:
+Every [encoding](story.md#encodings) needs two halves. An **encoder**
+turns a page's plain bytes into stored bytes, and a **decoder** turns
+them back. Create `src/nanolance/encodings.py`, beginning with the plain
+encoding, which is yesterday's way given a name:
 
 ```python
 """Analogy: the ways a packer can fill one box — each turns the box's plain
@@ -532,12 +536,12 @@ def from_plain(codec: struct.Struct, raw: bytes, rows: int) -> bytes:
 
 - The module works on **plain bytes**: one page's values back to back at
   the column's width, the bytes Day 2 wrote. An encoder never sees
-  Python values, only pieces of bytes, so every round-trip proof is byte
-  for byte.
+  Python values, only pieces of bytes, so every round-trip proof works
+  byte for byte.
 
-- Every decoder takes the same three arguments — the codec, the stored
-  bytes, and the page's row count — so any decoder can be called the
-  same way. The row count goes unused until section D's bit-packing.
+- Every decoder takes the same three arguments: the codec, the stored
+  bytes, and the page's row count. So you can call any decoder the same
+  way. The row count goes unused until section D's bit-packing.
 
 Then the dictionary, below `from_plain` in the same file:
 
@@ -571,16 +575,16 @@ def from_dictionary(codec: struct.Struct, raw: bytes, rows: int) -> bytes:
 
 - `dict.fromkeys(values)` keeps the distinct values in first-seen order:
   the legend. `code_of` maps each to its position, and `bytes(…)` stores
-  those positions — numbers from 0 to 255 — one byte each. More than 256
-  distinct values cannot be numbered in a byte, so the encoder refuses.
+  those positions, numbers from 0 to 255, one byte each. A byte cannot
+  number more than 256 distinct values, so past that the encoder refuses.
 
 - The page is three parts back to back: the count, the legend, the
-  codes. For 100 names with 8 distinct: 4 + 96 + 100 = 200 bytes.
+  codes. For 100 names with 8 distinct, that is 4 + 96 + 100 = 200 bytes.
   Iterating over `bytes` gives numbers, so `from_dictionary` walks the
   codes and looks each one up.
 
-Last in the file, the table of encodings and the two functions everyone
-else calls:
+Last in the file come the table of encodings and the two functions
+everyone else calls:
 
 ```python
 Encoder = Callable[[struct.Struct, bytes], bytes]
@@ -606,11 +610,11 @@ def decode(name: str, codec: struct.Struct, raw: bytes, rows: int) -> bytes:
     return decoder(codec, raw, rows)
 ```
 
-`ENCODINGS` maps each name to its encoder and decoder — functions sit in
+`ENCODINGS` maps each name to its encoder and decoder. Functions sit in
 a dict like any other value. Sections C and D each add one line here.
 
-Now the page file has to use them — and record which encoding each page
-uses. Five edits in `src/nanolance/page_file.py`:
+Now the page file has to use them, and record which encoding each page
+uses. Make five edits in `src/nanolance/page_file.py`:
 
 1. Import the new module, above the other `nanolance` imports (line 16):
 
@@ -624,8 +628,8 @@ uses. Five edits in `src/nanolance/page_file.py`:
    VERSION = 2  # 2: every page records its encoding
    ```
 
-3. Replace the `Page` class (lines 31–42) with this one — a fourth field,
-   with a default:
+3. Replace the `Page` class (lines 31–42) with this one. It has a fourth
+   field, with a default:
 
    ```python
    @dataclass(frozen=True)
@@ -644,11 +648,11 @@ uses. Five edits in `src/nanolance/page_file.py`:
        encoding: str = "plain"
    ```
 
-4. Replace `write` and `read_page` — lines 60–106, from `def write(`
-   through `read_page`'s `return values` — with this block: a new
+4. Replace `write` and `read_page` (lines 60–106, from `def write(`
+   through `read_page`'s `return values`) with this block. It holds a new
    `plain_pages`, then `write` with an `encoding` choice, and `read_page`
    with one decoding line. The metadata and footer code inside `write` is
-   unchanged; `read_column` and `read_rows` below it stay as they are:
+   unchanged, and `read_column` and `read_rows` below it stay as they are:
 
    ```python
    def plain_pages(
@@ -729,10 +733,10 @@ uses. Five edits in `src/nanolance/page_file.py`:
        return values
    ```
 
-5. In `read_metadata`, two replacements: its docstring (lines 136–143,
-   now around line 168) says which versions it reads, and the version
-   check (lines 154–157, now around line 187) accepts versions 1 to
-   `VERSION`. The `def` line and the `⋮` are already in your file:
+5. In `read_metadata`, make two replacements. Its docstring (lines
+   136–143, now around line 168) says which versions it reads. The
+   version check (lines 154–157, now around line 187) accepts versions 1
+   to `VERSION`. The `def` line and the `⋮` are already in your file:
 
    ```python
    def read_metadata(f: CountingFile) -> Metadata:
@@ -760,26 +764,26 @@ uses. Five edits in `src/nanolance/page_file.py`:
 What changed, and why:
 
 - `Page.encoding` is the [packing note](story.md#packing-note): the name
-  of the encoding the page's bytes are stored in. `json.dumps` already
+  of the encoding that stores the page's bytes. `json.dumps` already
   writes every field of a `Page`, so the note lands in the metadata, and
   `Page(**page)` reads it back.
 
 - `plain_pages` is yesterday's inner loop, moved out so the demo can use
   it too. `write` encodes each plain page with the column's chosen
-  encoding; `chosen.get(column, "plain")` stores any column not named in
-  plain.
+  encoding. `chosen.get(column, "plain")` stores any column you did not
+  name in plain.
 
 - `read_page` reads the stored bytes as before, and `encodings.decode`
-  turns them back into plain bytes; the rest is yesterday's code.
+  turns them back into plain bytes. The rest is yesterday's code.
 
 - **The version.** A version 1 file has no `encoding` in its metadata,
-  so `Page`'s default, `"plain"`, reads it correctly: the default *is*
-  the migration. The reader accepts versions 1 and 2; the writer always
-  writes 2.
+  so `Page`'s default, `"plain"`, reads it correctly. The default *is*
+  the migration. The reader accepts versions 1 and 2, and the writer
+  always writes 2.
 
-Prove that last claim before anything overwrites the evidence:
-yesterday's demo left a version 1 `pages.bin` in `warehouse/`. Read it
-with today's reader — `uv run python -` runs the lines that follow, up
+Prove that last claim before anything overwrites the evidence.
+Yesterday's demo left a version 1 `pages.bin` in `warehouse/`. Read it
+with today's reader. `uv run python -` runs the lines that follow, up
 to `EOF`:
 
 ```bash
@@ -802,7 +806,7 @@ EOF
 8125
 ```
 
-A version 1 file, read in full by today's reader: the same 8125 as
+Today's reader read a version 1 file in full and got the same 8125 as
 yesterday. Now re-run yesterday's demo, which rewrites `pages.bin` as
 version 2:
 
@@ -823,14 +827,14 @@ qty of rows 10–19 from pages.bin, told nothing = [40, 2, 1, 12, 4, 2, 3, 1, 40
 ⋮ (the refusal, unchanged)
 ```
 
-The answers and the pages are the same; the version and four numbers
-moved. `pages.bin` is 760 bytes bigger (34522 instead of 33762), because
-each of the 40 lines of [box lists](story.md#box-list) now ends with
-`,"encoding":"plain"` — 19 bytes, 40 times — and the opening reads them:
-2522 instead of 1762. Yesterday's tests pin the old numbers; the test
-edits below update them.
+The answers and the pages are the same, but the version and four
+numbers moved. `pages.bin` is 760 bytes bigger (34522 instead of 33762).
+Each of the 40 lines of [box lists](story.md#box-list) now ends with
+`,"encoding":"plain"`, which is 19 bytes, 40 times. The opening reads
+them too: 2522 instead of 1762. Yesterday's tests pin the old numbers,
+and the test edits below update them.
 
-Now the demo. In `src/nanolance/cli.py`, four edits:
+Now the demo. Make four edits in `src/nanolance/cli.py`:
 
 1. The `from nanolance import` line (line 7) gains `encodings`:
 
@@ -844,7 +848,7 @@ Now the demo. In `src/nanolance/cli.py`, four edits:
    from nanolance.orders import COLUMNS, ORDERS, ROW_WIDTH, Row, many_orders
    ```
 
-3. Between `describe` and `packing` (around line 162), two helpers:
+3. Between `describe` and `packing` (around line 162), add two helpers:
 
    ```python
    # ──────── new code starts here (around line 162) ────────
@@ -893,7 +897,7 @@ Now the demo. In `src/nanolance/cli.py`, four edits:
    # ──────── new code ends here ────────
    ```
 
-4. At the end of `packing` (around line 226), after the loop:
+4. At the end of `packing` (around line 226), after the loop, add:
 
    ```python
        # ──────── new code starts here (around line 226) ────────
@@ -904,15 +908,15 @@ Now the demo. In `src/nanolance/cli.py`, four edits:
    ```
 
 - `every_way` encodes each column's pages with every encoding in
-  `ENCODINGS` and prints the total bytes; an encoding that refuses
-  (`ValueError`) prints `—`. Because it walks `ENCODINGS`, every encoding
-  you register later shows up in this table on its own.
+  `ENCODINGS` and prints the total bytes. An encoding that refuses
+  (`ValueError`) prints `—`. Because `every_way` walks `ENCODINGS`, every
+  encoding you register later shows up in this table on its own.
 
-- `write_and_read_back` writes a real file, prints its size and its
-  pages' share, then reads every column back through the metadata
-  alone; `zip(*columns, strict=True)` turns the columns back into rows.
-  The demo stores price, qty, and name as dictionaries and leaves id
-  plain — the first table line says why.
+- `write_and_read_back` writes a real file and prints its size and its
+  pages' share. Then it reads every column back through the metadata
+  alone, and `zip(*columns, strict=True)` turns the columns back into
+  rows. The demo stores price, qty, and name as dictionaries and leaves
+  id plain. The first table line says why.
 
 Run it:
 
@@ -936,13 +940,13 @@ Read it line by line:
 
 - `id: plain 8000, dictionary 9040` — `every_way` on the id column, and
   the first time an encoding makes things worse. Every id on a page is
-  different, so the legend holds all 100 (800 bytes), plus the count and
-  100 codes: 904 per page.
+  different, so the legend holds all 100 (800 bytes). Add the count and
+  100 codes, and that is 904 per page.
 
-- `price: plain 8000, dictionary 1680` — 8 distinct prices: 4 + 64 +
+- `price: plain 8000, dictionary 1680` — 8 distinct prices make 4 + 64 +
   100 = 168 bytes per page, about a fifth of plain.
 
-- `qty: plain 4000, dictionary 1280` — 6 distinct quantities: 4 + 24 +
+- `qty: plain 4000, dictionary 1280` — 6 distinct quantities make 4 + 24 +
   100 = 128 per page.
 
 - `name: plain 12000, dictionary 2000` — the
@@ -950,18 +954,18 @@ Read it line by line:
   of plain.
 
 - `write dictionary.bin: 15612 bytes, pages 12960 (plain: 32000)` —
-  `write_and_read_back`: 8000 + 1680 + 1280 + 2000 = 12960 bytes of
+  `write_and_read_back` wrote 8000 + 1680 + 1280 + 2000 = 12960 bytes of
   pages, then the metadata and the 24-byte footer.
 
 - `read back, told nothing: same as the table? True` — a reader that
-  knew only the file decoded every page by its packing note and got all
+  knew only the file decoded every page by its packing note. It got all
   thousand orders back.
 
-Now the other direction: a reader that only knows version 1 has no idea
-pages can be dictionaries, and would read a legend and codes as if they
-were quantities. Git can print a file as it was at any checkpoint, so
-save Day 2's `page_file.py` next to the warehouse files and point it at
-`dictionary.bin`:
+Now try the other direction. A reader that only knows version 1 has no
+idea pages can be dictionaries. It would read a legend and codes as if
+they were quantities. Git can print a file as it was at any checkpoint,
+so save Day 2's `page_file.py` next to the warehouse files and point it
+at `dictionary.bin`:
 
 ```bash
 git show v1-day-02:src/nanolance/page_file.py > warehouse/day2_page_file.py
@@ -986,11 +990,11 @@ ValueError: nanolance file version 2; this reader reads version 1
 ```
 
 Yesterday's reader read the wall card, saw edition 2, and
-[turned around](story.md#stamp) — exactly what Day 2's version check was
-for. Compatibility runs one way: a new reader reads old files, and an
-old reader refuses new ones instead of misreading them.
+[turned around](story.md#stamp). That is exactly what Day 2's version
+check was for. Compatibility runs one way. A new reader reads old files,
+and an old reader refuses new ones instead of misreading them.
 
-Pin it all with tests — six edits in three files:
+Pin it all with tests. There are six edits in three files:
 
 <details>
 <summary>Copy-friendly: the tests (click to open)</summary>
@@ -1074,8 +1078,8 @@ Pin it all with tests — six edits in three files:
    ```
 
 4. In `tests/test_page_file.py`, `test_another_version_is_refused`
-   (lines 112–119) used version 2 as "another version" — which is now
-   ours. Replace its last three lines (117–119) with version 3:
+   (lines 112–119) used version 2 as "another version", but version 2 is
+   now ours. Replace its last three lines (117–119) with version 3:
 
    ```python
    def test_another_version_is_refused(tmp_path):
@@ -1087,8 +1091,8 @@ Pin it all with tests — six edits in three files:
            open_metadata(path)
    ```
 
-5. In `tests/test_page_file.py`, at the bottom (around line 129), three
-   tests:
+5. In `tests/test_page_file.py`, at the bottom (around line 129), add
+   three tests:
 
    ```python
    # ──────── new code starts here (around line 129) ────────
@@ -1136,8 +1140,8 @@ Pin it all with tests — six edits in three files:
    # ──────── new code ends here ────────
    ```
 
-6. In `tests/test_cli.py`, at the bottom (around line 149), a test of the
-   new demo lines:
+6. In `tests/test_cli.py`, at the bottom (around line 149), add a test of
+   the new demo lines:
 
    ```python
    # ──────── new code starts here (around line 149) ────────
@@ -1164,20 +1168,19 @@ Pin it all with tests — six edits in three files:
 
 What the tests prove:
 
-- `round_trip`, the helper every test leans on, encodes, decodes, and
-  checks the decoded bytes are *exactly* the plain bytes.
+- `round_trip` is the helper every test leans on. It encodes, decodes,
+  and checks that the decoded bytes are *exactly* the plain bytes.
 
 - Two stacked `parametrize` lines run
   `test_every_encoding_gives_back_exactly_what_went_in` for every
-  encoding × every page in `QTY_PAGES` — an empty page, one value, all
-  equal, the widest quantity, a real page — and pytest counts each run
-  as its own test. Because it loops over `ENCODINGS`, the encodings of
-  sections C and D are proven by this same test the moment you register
-  them.
+  encoding × every page in `QTY_PAGES`. The pages are an empty page, one
+  value, all equal, the widest quantity, and a real page. Pytest counts
+  each run as its own test. Because the test loops over `ENCODINGS`, it
+  proves the encodings of sections C and D the moment you register them.
 
 - `test_a_version_1_file_still_reads_as_all_plain` builds a version 1
-  file by hand — today's file with every `encoding` deleted and a
-  version 1 footer — and reads it.
+  file by hand and reads it. The file is today's file with every
+  `encoding` deleted and a version 1 footer.
 
 ```bash
 uv run pytest -q
@@ -1188,9 +1191,9 @@ uv run pytest -q
 61 passed in 0.45s
 ```
 
-Sixty-one tests: twenty more — sixteen in the new file (ten of them the
-parametrized round trips), three for the page file, and one for the
-demo.
+That makes sixty-one tests. The twenty new ones are sixteen in the new
+file (ten of them the parametrized round trips), three for the page
+file, and one for the demo.
 
 **Section checkpoint:** `./scripts/compare.sh v1-day-03b`
 
@@ -1200,11 +1203,11 @@ demo.
 <a href="https://docs.python.org/3.12/library/stdtypes.html#typesseq-common"><code>value * length</code>: a byte string repeated <code>length</code> times</a>
 </div>
 
-The first page of the sorted orders holds one name, a hundred times in
-a row. A dictionary would still spend a byte per value, plus the name
-once. **Run-length
+Your dictionary already shrinks the names. But the first page of the
+sorted orders holds one name, a hundred times in a row, and a dictionary
+would still spend a byte per value, plus the name once. **Run-length
 encoding** stores each run once: the value and how many times it
-repeats. Four edits in `src/nanolance/encodings.py`:
+repeats. Make four edits in `src/nanolance/encodings.py`:
 
 1. Below `from collections.abc import Callable` (line 11), import the
    tool that `describe` used in section A:
@@ -1213,8 +1216,8 @@ repeats. Four edits in `src/nanolance/encodings.py`:
    from itertools import groupby
    ```
 
-2. The comment above `COUNT` (lines 13–14) gains a second use — `COUNT`
-   now also holds a run's length:
+2. The comment above `COUNT` (lines 13–14) gains a second use, because
+   `COUNT` now also holds a run's length:
 
    ```python
    # A 4-byte count, stored inside a page: how many distinct values a
@@ -1222,7 +1225,7 @@ repeats. Four edits in `src/nanolance/encodings.py`:
    ```
 
 3. Between `from_dictionary` and `Encoder = Callable` (around line 64),
-   the encoder and its decoder:
+   add the encoder and its decoder:
 
    ```python
    # ──────── new code starts here (around line 64) ────────
@@ -1253,7 +1256,7 @@ repeats. Four edits in `src/nanolance/encodings.py`:
    # ──────── new code ends here ────────
    ```
 
-4. And in `ENCODINGS` (around line 97), register it after the
+4. In `ENCODINGS` (around line 97), register it after the
    dictionary:
 
    ```python
@@ -1264,13 +1267,13 @@ repeats. Four edits in `src/nanolance/encodings.py`:
    }
    ```
 
-`groupby` finds the runs, as in section A's `describe`; a page of 100
-identical names becomes one 12-byte name and one 4-byte count, 16 bytes.
+`groupby` finds the runs, as in section A's `describe`. A page of 100
+identical names becomes one 12-byte name and one 4-byte count: 16 bytes.
 The decoder steps through value-and-count pairs and repeats each value
 (`value * length`).
 
-At the end of `packing` in `src/nanolance/cli.py` (around line 231), the
-sorted orders get the same treatment:
+At the end of `packing` in `src/nanolance/cli.py` (around line 231),
+give the sorted orders the same treatment:
 
 ```python
     # ──────── new code starts here (around line 231) ────────
@@ -1306,41 +1309,41 @@ write sorted.bin: 11168 bytes, pages 8568 (plain: 32000)
 ```
 
 Above the divider, each line of the first table gained a `run-length`
-entry — `every_way` found the new encoding in `ENCODINGS` on its own.
-Read the new parts line by line:
+entry, because `every_way` found the new encoding in `ENCODINGS` on its
+own. Read the new parts line by line:
 
 - `id: plain 8000, dictionary 9040, run-length 12000` and the three lines
   under it — run-length on the orders as placed is **worse than plain for
   every column**. As placed, no two neighbors are equal (section A's
   "longest run 1"), so every value becomes a [stack](story.md#stacks) of
-  one, and pays for its count: 12000 instead of 8000 for ids, and 8000
-  instead of 4000 for quantities — twice plain, because a 4-byte count
-  joins every 4-byte quantity.
+  one and pays for its count. The ids take 12000 instead of 8000. The
+  quantities take 8000 instead of 4000, twice plain, because a 4-byte
+  count joins every 4-byte quantity.
 
 - `every column packed every way, orders sorted by name` and its four
   lines — the same encodings on the sorted table. The ids are still all
   different, so nothing changes for them. But the other three columns
-  are long runs now: 192 bytes of prices instead of 8000, 120 of
-  quantities instead of 4000, 256 of names instead of 12000.
+  are long runs now. Prices take 192 bytes instead of 8000, quantities
+  120 instead of 4000, and names 256 instead of 12000.
 
-- `qty: …, run-length 120` — 15 runs of 8 bytes. The names make 16 runs
-  (every page boundary inside a name's 125 orders starts a new run), but
-  the quantities make one fewer: `padlock` and `tape` orders both have a
-  quantity of 2, so their runs join. Run-length only sees equal
-  neighbors; it does not care which item they came from.
+- `qty: …, run-length 120` — 15 runs of 8 bytes. The names make 16 runs,
+  because every page boundary inside a name's 125 orders starts a new
+  run. The quantities make one fewer. `padlock` and `tape` orders both
+  have a quantity of 2, so their runs join. Run-length only sees equal
+  neighbors. It does not care which item they came from.
 
 - `write sorted.bin: 11168 bytes, pages 8568 (plain: 32000)` and `read
-  back … True` — the sorted orders stored with run-length for price,
-  quantity, and name: 8000 + 192 + 120 + 256 = 8568 bytes of pages, read
-  back exactly.
+  back … True` — the sorted orders, stored with run-length for price,
+  quantity, and name. That makes 8000 + 192 + 120 + 256 = 8568 bytes of
+  pages, read back exactly.
 
 The same encoding shrinks the quantities 33-fold on one table and
-doubles them on the other, and only the order of the rows changed. That
+doubles them on the other, and only the order of the rows changed. Here
 is the honest lesson of encodings: none of them is good in general. Each
 one is good for a *shape* of data, and the writer has to look at the
 data to choose.
 
-Pin it with tests — four edits in two files:
+Pin it with tests. There are four edits in two files:
 
 1. In `tests/test_encodings.py`, the list in
    `test_text_and_floats_round_trip_too`'s decorator (line 35) gains
@@ -1350,8 +1353,8 @@ Pin it with tests — four edits in two files:
    @pytest.mark.parametrize("name", ["plain", "dictionary", "run-length"])
    ```
 
-2. In `tests/test_encodings.py`, at the bottom (around line 60), two
-   tests — the exact layout and the backfire:
+2. In `tests/test_encodings.py`, at the bottom (around line 60), add two
+   tests, one for the exact layout and one for the backfire:
 
    ```python
    # ──────── new code starts here (around line 60) ────────
@@ -1373,11 +1376,11 @@ Pin it with tests — four edits in two files:
 
 3. In `tests/test_cli.py`, update the four table lines in
    `test_packing_packs_every_column_every_way` (around line 157) to the
-   run's new lines — or take the finished file, step 4 included, with
+   run's new lines. Or take the finished file, step 4 included, with
    `git checkout v1-day-03c -- tests/test_cli.py`.
 
-4. In `tests/test_cli.py`, at the bottom (around line 164), a test of the
-   sorted lines:
+4. In `tests/test_cli.py`, at the bottom (around line 164), add a test of
+   the sorted lines:
 
    ```python
    # ──────── new code starts here (around line 164) ────────
@@ -1409,10 +1412,10 @@ uv run pytest -q
 70 passed in 0.46s
 ```
 
-Seventy tests: nine more. Five of them you did not write: the
-parametrized round trip from section B ran its five pages through
-run-length on its own. Then one more text-and-floats case, the two new
-encoding tests, and one for the demo.
+That makes seventy tests, nine more. You did not write five of them:
+the parametrized round trip from section B ran its five pages through
+run-length on its own. The other four are one more text-and-floats case,
+the two new encoding tests, and one for the demo.
 
 **Section checkpoint:** `./scripts/compare.sh v1-day-03c`
 
@@ -1431,19 +1434,19 @@ encoding tests, and one for the demo.
 <a href="https://docs.pytest.org/en/stable/how-to/parametrize.html">pytest: several parameters per case, <code>("column", "values")</code></a>
 </div>
 
-The quantities as placed have no runs, and a dictionary still spends a
-byte per value. But section A said the largest quantity needs 6 bits.
-**Bit-packing** stores every value of a page in exactly as many bits as
-the page's largest value needs, and writes that width once, at the
-start of the page.
+Run-length cannot help the quantities as placed, because they have no
+runs, and a dictionary still spends a byte per value. But section A said
+the largest quantity needs 6 bits. **Bit-packing** stores every value of
+a page in exactly as many bits as the page's largest value needs. It
+writes that width once, at the start of the page.
 
 Python makes this unusually short, because a Python `int` can be as
-large as you like: the encoder builds the whole page as one big number,
-value 0 in the lowest bits, value 1 in the next `width` bits, and so on,
-then writes that number as bytes. Four edits in
+large as you like. The encoder builds the whole page as one big number:
+value 0 in the lowest bits, value 1 in the next `width` bits, and so on.
+Then it writes that number as bytes. Make four edits in
 `src/nanolance/encodings.py`:
 
-1. Below `MAX_DICTIONARY` (around line 19), the width's one byte:
+1. Below `MAX_DICTIONARY` (around line 19), add the width's one byte:
 
    ```python
    # ──────── new code starts here (around line 19) ────────
@@ -1453,7 +1456,7 @@ then writes that number as bytes. Four edits in
    ```
 
 2. Between `from_run_length` and `Encoder = Callable` (around line 90),
-   the encoder, its decoder, and the check they share:
+   add the encoder, its decoder, and the check they share:
 
    ```python
    # ──────── new code starts here (around line 90) ────────
@@ -1505,7 +1508,7 @@ then writes that number as bytes. Four edits in
    }
    ```
 
-4. At the bottom of the file (around line 150), the weigh-in:
+4. At the bottom of the file (around line 150), add the weigh-in:
 
    ```python
    # ──────── new code starts here (around line 150) ────────
@@ -1531,8 +1534,8 @@ then writes that number as bytes. Four edits in
    # ──────── new code ends here ────────
    ```
 
-How the bits move, on the page `[3, 1, 2]` (the largest, 3, needs 2
-bits):
+Here is how the bits move on the page `[3, 1, 2]`, where the largest
+value, 3, needs 2 bits:
 
 ```text
 value 0: 3 = 11      shifted left 0 bits  →  ......11
@@ -1542,25 +1545,26 @@ packed (| of all three)                    →  00100111  = 1 byte: 39
 ```
 
 - **Encode:** `bit_packed` shifts each value left by `position * width`
-  bits (`<<`) and ORs it into one number (`|=`), as the picture shows,
-  then writes that number in whole bytes, lowest bits first.
-  `whole_numbers` refuses anything else first: prices, names, and
+  bits (`<<`) and ORs it into one number (`|=`), as the picture shows.
+  Then it writes that number in whole bytes, lowest bits first. Before
+  that, `whole_numbers` refuses anything else: prices, names, and
   negative numbers.
 
 - **Decode:** `from_bit_packed` shifts value `position` back down
-  (`>>`) and keeps its lowest `width` bits with `& mask`, where the mask,
-  `(1 << width) - 1`, is `width` one-bits — binary `11` for a width of 2.
+  (`>>`) and keeps its lowest `width` bits with `& mask`. The mask,
+  `(1 << width) - 1`, is `width` one-bits: binary `11` for a width of 2.
 
 - **Why `rows`:** the bytes alone cannot say whether the last zero bits
-  are padding or values of 0, so here, at last, a decoder needs the
+  are padding or values of 0. So here, at last, a decoder needs the
   page's row count.
 
-`smallest` is [the weigh-in](story.md#weigh-in): encode the page every
-way, skip any encoding that refuses, keep the fewest bytes — and since
-it only replaces plain with something strictly smaller, plain wins a tie.
+`smallest` is [the weigh-in](story.md#weigh-in). It encodes the page
+every way, skips any encoding that refuses, and keeps the fewest bytes.
+It only replaces plain with something strictly smaller, so plain wins a
+tie.
 
-Then let `write` run the weigh-in. In `src/nanolance/page_file.py`, two
-edits in `write`:
+Then let `write` run the weigh-in. In `src/nanolance/page_file.py`, make
+two edits in `write`:
 
 1. Its docstring (lines 87–89) mentions the new choice:
 
@@ -1573,7 +1577,7 @@ edits in `write`:
 
 2. In the page loop, replace the lines from
    `data = encodings.encode(name, codec, plain)` down to the `)` that
-   closes `Page(` (lines 97–101) with these — the `"smallest"`
+   closes `Page(` (lines 97–101) with these. They add the `"smallest"`
    instruction from §4, and `encoding=used` instead of `encoding=name`:
 
    ```python
@@ -1590,7 +1594,7 @@ edits in `write`:
                    )
    ```
 
-Now the demo. Six edits in `src/nanolance/cli.py`:
+Now the demo. Make six edits in `src/nanolance/cli.py`:
 
 1. Below `import argparse` (line 3):
 
@@ -1614,7 +1618,7 @@ Now the demo. Six edits in `src/nanolance/cli.py`:
    ```
 
 4. … and add a last line to it, after the `print` of `read back` (around
-   line 204), one indent in from that `print` — outside the `with`:
+   line 204). It sits one indent in from that `print`, outside the `with`:
 
    ```python
            same = list(zip(*columns, strict=True)) == table
@@ -1624,7 +1628,7 @@ Now the demo. Six edits in `src/nanolance/cli.py`:
 
    (The first two lines are already in your file.)
 
-5. Between `write_and_read_back` and `packing` (around line 208), two
+5. Between `write_and_read_back` and `packing` (around line 208), add two
    helpers:
 
    ```python
@@ -1659,7 +1663,7 @@ Now the demo. Six edits in `src/nanolance/cli.py`:
    # ──────── new code ends here ────────
    ```
 
-6. At the end of `packing` (around line 266):
+6. At the end of `packing` (around line 266), add:
 
    ```python
        # ──────── new code starts here (around line 266) ────────
@@ -1679,11 +1683,11 @@ Now the demo. Six edits in `src/nanolance/cli.py`:
        # ──────── new code ends here ────────
    ```
 
-`packing_notes` counts each column's packing notes (`Counter`), and
-`ask_qty` asks yesterday's two questions of a freshly opened file,
-splitting its tally into the opening and the pages. The demo writes a
-plain baseline, the two `"smallest"` files, and asks both questions of
-the plain file and the smallest one.
+`packing_notes` counts each column's packing notes (`Counter`). `ask_qty`
+asks yesterday's two questions of a freshly opened file, and splits its
+tally into the opening and the pages. The demo writes a plain baseline
+and the two `"smallest"` files. Then it asks both questions of the plain
+file and the smallest one.
 
 Run it:
 
@@ -1724,47 +1728,49 @@ qty of rows 10–19 from smallest.bin, told nothing = [40, 2, 1, 12, 4, 2, 3, 1,
 Read it line by line:
 
 - `id: …, bit-packed 1212` — [snug compartments](story.md#snug-compartments)
-  for the ids: the pages' largest ids need 8 to 11 bits (200 needs 8;
-  1100 needs 11) instead of 64. The only encoding that shrinks the ids.
+  for the ids. The pages' largest ids need 8 to 11 bits (200 needs 8,
+  1100 needs 11) instead of 64. Bit-packing is the only encoding that
+  shrinks the ids.
 
 - `price: …, bit-packed —` and `name: …, bit-packed —` —
-  `whole_numbers` refused: prices are floats and names are text.
+  `whole_numbers` refused, because prices are floats and names are text.
 
 - `qty: …, bit-packed 760` — 76 bytes per page: one byte of width, then
-  100 values × 6 bits = 75 bytes. Sorted, `bit-packed 424` loses to
-  run-length's 120: a hundred 2-bit values still take 25 bytes, and one
-  run takes 8.
+  100 values × 6 bits = 75 bytes. On the sorted orders, `bit-packed 424`
+  loses to run-length's 120. A hundred 2-bit values still take 25 bytes,
+  and one run takes 8.
 
-- `write plain.bin` — the baseline, every page plain: the same file
-  `nanolance pages` writes as `pages.bin`. Then `write smallest.bin:
-  8320 bytes, pages 5652` and its `chosen:` line — every page took the
-  lightest of the four: 1212 + 1680 + 760 + 2000 =
-  5652 bytes of pages, under a fifth of plain, read back exactly.
+- `write plain.bin` — the baseline, with every page plain. It is the same
+  file `nanolance pages` writes as `pages.bin`. Then come `write
+  smallest.bin: 8320 bytes, pages 5652` and its `chosen:` line. Every
+  page took the lightest of the four: 1212 + 1680 + 760 + 2000 = 5652
+  bytes of pages, under a fifth of plain, read back exactly.
 
-- `write sorted-smallest.bin: …, pages 1932` and its `chosen:` line — the
-  same weigh-in on the sorted orders picks run-length for the three
+- `write sorted-smallest.bin: …, pages 1932` and its `chosen:` line — on
+  the sorted orders, the same weigh-in picks run-length for the three
   repetitive columns and still bit-packs the ids. Each page chose from
   its own bytes.
 
 - `sum(qty)` and `qty of rows 10–19` from each file — the same answers.
   The [stock count](story.md#stock-count) reads 4000 bytes of pages from
-  the plain file and 760 from the smallest, in the same 12 reads; ten
-  quantities read 400 against 76. Fewer bytes on disk, fewer bytes read.
+  the plain file and 760 from the smallest, in the same 12 reads. Ten
+  quantities read 400 bytes against 76. Fewer bytes on disk mean fewer
+  bytes read.
 
-Two honest notes on these numbers. First, the opening — the footer and
-metadata — is now most of what a small question reads: 2668 of the 2744
+Two honest notes on these numbers. First, the opening (the footer and
+metadata) is now most of what a small question reads: 2668 of the 2744
 bytes. It even grew by 146 bytes, because `"bit-packed"` and
 `"dictionary"` are longer to write than `"plain"`. With Lance's 8 MB
 pages, the metadata is a sliver and the pages are everything. Second,
 **the weigh-in has a price, paid when writing**. To keep 5652 bytes, the
-writer encoded every entry of the first table: 22252 bytes of ids, 13680
-of prices, 10040 of quantities, and 18000 of names besides the plain
-bytes it started from — 63972 bytes made to keep 5652, more than eleven
-for every one kept, plus twenty bit-packing attempts refused. That is
-why real Lance decides from cheap counts (§5) instead of trying
-everything.
+writer encoded every entry of the first table. Besides the plain bytes
+it started from, it made 22252 bytes of ids, 13680 of prices, 10040 of
+quantities, and 18000 of names. That is 63972 bytes made to keep 5652,
+more than eleven for every one kept, plus twenty bit-packing attempts
+refused. That cost is why real Lance decides from cheap counts (§5)
+instead of trying everything.
 
-Pin it with tests — five edits in three files:
+Pin it with tests. There are five edits in three files:
 
 1. In `tests/test_encodings.py`, line 4 imports `WIDTH` too:
 
@@ -1819,13 +1825,13 @@ Pin it with tests — five edits in three files:
    # ──────── new code ends here ────────
    ```
 
-   `0b10_01_11` is the picture above, written in bits: underscores in a
-   number are only for reading. The last test pins the weigh-in page by
-   page — including the tie, where plain and run-length both store an
-   empty page in 0 bytes, and plain wins.
+   `0b10_01_11` is the picture above, written in bits. Underscores in a
+   number are only there to help you read it. The last test pins the
+   weigh-in page by page. That includes the tie, where plain and
+   run-length both store an empty page in 0 bytes, and plain wins.
 
-3. In `tests/test_page_file.py`, at the bottom (around line 174), a
-   column whose two pages choose differently:
+3. In `tests/test_page_file.py`, at the bottom (around line 174), add a
+   test of a column whose two pages choose differently:
 
    ```python
    # ──────── new code starts here (around line 174) ────────
@@ -1846,7 +1852,7 @@ Pin it with tests — five edits in three files:
 4. In `tests/test_cli.py`, update the eight table lines in
    `test_packing_packs_every_column_every_way` and
    `test_packing_stacks_the_sorted_orders_in_runs` to the run's new
-   lines — or take the finished file, step 5 included, with
+   lines. Or take the finished file, step 5 included, with
    `git checkout v1-day-03d -- tests/test_cli.py`.
 
 5. In `tests/test_cli.py`, at the bottom (around line 180):
@@ -1889,12 +1895,12 @@ uv run pytest -q
 87 passed in 0.59s
 ```
 
-Eighty-seven tests: seventeen more — again five round trips you did not
-write, run through bit-packing by section B's test; three tests of
-bit-packing's layout, three refusals, four cases of the weigh-in, one for
-the page file, and one for the demo.
+That makes eighty-seven tests, seventeen more. Again, five are round
+trips you did not write, which section B's test ran through bit-packing.
+The rest are three tests of bit-packing's layout, three refusals, four
+cases of the weigh-in, one for the page file, and one for the demo.
 
-**Section checkpoint:** `./scripts/compare.sh v1-day-03d` — which is
+**Section checkpoint:** `./scripts/compare.sh v1-day-03d`. This one is
 also the finished day.
 
 ## 7. Run it
@@ -1951,17 +1957,17 @@ qty of rows 10–19 from smallest.bin, told nothing = [40, 2, 1, 12, 4, 2, 3, 1,
 
 The whole day at the packer's bench, one stretch at a time:
 
-- The first eleven lines — the packer looks inside the boxes: few
-  distinct values, long runs once sorted, small numbers in wide
+- The first eleven lines — the packer looks inside the boxes and finds
+  few distinct values, long runs once sorted, and small numbers in wide
   compartments.
 
 - The first table and `dictionary.bin` — every column encoded every
-  way, where the [lid legend](story.md#lid-legend) wins on repeated
-  values and loses on ids, and a real file decoded by its
+  way. The [lid legend](story.md#lid-legend) wins on repeated values and
+  loses on ids, and a real file is decoded by its
   [packing notes](story.md#packing-note).
 
-- The second table and `sorted.bin` — [stacks](story.md#stacks): a 2×
-  loss on the orders as placed, a huge win once sorted.
+- The second table and `sorted.bin` — [stacks](story.md#stacks) lose 2×
+  on the orders as placed and win hugely once they are sorted.
 
 - The `bit-packed` entries — [snug compartments](story.md#snug-compartments)
   for whole numbers.
@@ -1969,28 +1975,29 @@ The whole day at the packer's bench, one stretch at a time:
 - `plain.bin` through the second `chosen:` — [the weigh-in](story.md#weigh-in),
   page by page.
 
-- The last eight lines — yesterday's questions: the same answers for a
-  fraction of the page bytes.
+- The last eight lines — yesterday's questions get the same answers for
+  a fraction of the page bytes.
 
-Nothing here varies between runs: no randomness, no timing, only counts.
+Nothing here varies between runs. There is no randomness and no timing,
+only counts.
 
 ## 9. Test it
 
-`uv run pytest -q` now runs eighty-seven tests — the `87 passed` of
-section D. That is Day 2's 40 plus 47 new ones: the first-page counts
-(section A, 1 test), the encodings module, packing notes, and version 2
-(section B, 20), run-length (section C, 9), and bit-packing with the
-weigh-in (section D, 17). Seventy-four are unit tests; the other
-thirteen (`test_cli_says_hello` and the twelve in `test_cli.py`) run the
-real command line.
+`uv run pytest -q` now runs eighty-seven tests, the `87 passed` of
+section D. That is Day 2's 40 plus 47 new ones. They cover the
+first-page counts (section A, 1 test), the encodings module, packing
+notes, and version 2 (section B, 20), run-length (section C, 9), and
+bit-packing with the weigh-in (section D, 17). Seventy-four are unit
+tests. The other thirteen (`test_cli_says_hello` and the twelve in
+`test_cli.py`) run the real command line.
 
-Every encoding passes the same round-trip proof — an empty page, one
-value, all values equal, the widest value, a real page — so "fewer bytes"
-never means "different values".
+Every encoding passes the same round-trip proof: an empty page, one
+value, all values equal, the widest value, and a real page. So "fewer
+bytes" never means "different values".
 
 ## 10. Break it deliberately
 
-Drop the `- 1` from the decoder's mask. In `from_bit_packed` in
+Now drop the `- 1` from the decoder's mask. In `from_bit_packed` in
 `src/nanolance/encodings.py`, change one line:
 
 ```diff
@@ -2001,8 +2008,8 @@ Drop the `- 1` from the decoder's mask. In `from_bit_packed` in
      return b"".join(
 ```
 
-For a width of 6, the mask should be binary `111111`; it is now
-`1000000` — a single bit, the one *just above* each value. The encoder
+For a width of 6, the mask should be binary `111111`. It is now
+`1000000`: a single bit, the one *just above* each value. The encoder
 is untouched, so every file is written exactly as before. Run the tests:
 
 ```bash
@@ -2020,32 +2027,32 @@ E   struct.error: 'q' format requires -9223372036854775808 <= number <= 92233720
 E   assert [64, 0, 0, 64, 0, 0, ...] == [3, 1, 40, 2, 1, 12, ...]
 ```
 
-(Only the `E` lines are shown — one per failing test. Pytest's summary
+(Only the `E` lines are shown, one per failing test. Pytest's summary
 line reads `8 failed, 79 passed`.)
 
 Read it line by line:
 
-- `['write small...'] == ['write small...']` — the demo test: the
+- `['write small...'] == ['write small...']` — the demo test. The
   smallest file no longer reads back as the table.
 
 - `b'\x00\x00\x00\x00' == b'\x07\x00\x00\x00'` and the next lines of
-  bytes — the round trips: a one-value page of 7 came back as 0. Each
+  bytes — the round trips. A one-value page of 7 came back as 0. Each
   decoded value is now only the single bit above it, which belongs to
   its neighbor.
 
-- the two `struct.error` lines — the widest values: with a mask of
+- The two `struct.error` lines — the widest values. With a mask of
   `1 << 31` or `1 << 63`, the "value" is too big to pack back into its
   column's width, so these two fail loudly.
 
-- `[64, 0, 0, 64, …] == [3, 1, 40, 2, …]` — the page-file test reading
-  quantities back: real-looking numbers, all wrong.
+- `[64, 0, 0, 64, …] == [3, 1, 40, 2, …]` — the page-file test reads
+  quantities back and gets real-looking numbers, all wrong.
 
-- Two decoding tests still pass: an empty page and a page of zeros
+- Two decoding tests still pass. An empty page and a page of zeros
   decode correctly with *any* mask, because every bit is 0. A bug that
-  only touches nonzero bits hides from those two cases — which is why
-  the round-trip test also uses real pages.
+  only touches nonzero bits hides from those two cases. That is why the
+  round-trip test also uses real pages.
 
-The demo shows how quietly the wrong answers arrive — here are only its
+The demo shows how quietly the wrong answers arrive. Here are only its
 `smallest.bin` lines, picked out of the run:
 
 ```bash
@@ -2061,18 +2068,18 @@ qty of rows 10–19 from smallest.bin, told nothing = [0, 64, 0, 0, 0, 64, 64, 0
   tally: reads 3, bytes read 2744, seeks 3 (opening 2668, pages 76)
 ```
 
-Every size is unchanged — the writer did nothing wrong. But the file
-fails its read-back, and the stock count says 23360 — no error, a
-confident wrong number, from the same 760 bytes. **An encoding is
-correct only if its decoder gives back the exact plain bytes**, and only
-a round-trip test proves that.
+Every size is unchanged, because the writer did nothing wrong. But the
+file fails its read-back, and the stock count says 23360. There is no
+error, only a confident wrong number from the same 760 bytes. **An
+encoding is correct only if its decoder gives back the exact plain
+bytes**, and only a round-trip test proves that.
 
 Put the `- 1` back and confirm `uv run pytest -q` is green again.
 
 ## 11. Checkpoint
 
-Every checkpoint — each section and the day — is done only when the full
-green bar passes:
+Every checkpoint, each section and the day alike, is done only when the
+full green bar passes:
 
 ```bash
 ./scripts/check.sh
@@ -2100,13 +2107,13 @@ GREEN: all gates passed
   (now over two new Python files and this chapter's code blocks), and the
   whole suite.
 
-- the `⋮` lines through `GREEN: all gates passed` — the smoke gate's
+- The `⋮` lines through `GREEN: all gates passed` — the smoke gate's
   three demos, now including `nanolance packing` (section 8's output),
   then the book build.
 
 The smoke gate gained one line today: `uv run --locked nanolance packing
 "$scratch"`. `scripts/check.sh` is course infrastructure, outside what
-`compare.sh` checks; to pick up today's copy, take it from the
+`compare.sh` checks. To pick up today's copy, take it from the
 checkpoint:
 
 ```bash
@@ -2116,7 +2123,7 @@ git checkout v1-day-03 -- scripts/check.sh
 Then close out the day in whichever mode you are following:
 
 **Built along on your own branch?** Confirm your code matches the finished
-day — the final ✓ line means it does:
+day. The final ✓ line means it does:
 
 ```bash
 ./scripts/compare.sh v1-day-03
@@ -2131,7 +2138,7 @@ uv run nanolance packing
 git switch -          # back to where you were
 ```
 
-**Either way**, today's complete change set — docs included — reads as one
+**Either way**, today's complete change set, docs included, reads as one
 diff:
 
 ```bash
@@ -2147,10 +2154,10 @@ git diff v1-day-02 v1-day-03
   `dictionary`, `run_length`, and `bit_packed`, registered by name in
   `ENCODINGS`, plus `smallest`, the weigh-in.
 
-- `page_file.py` — `plain_pages`; a `Page.encoding` packing note on every
-  page; `write`'s per-column `encoding` choice, with `"smallest"` picking
-  page by page; a `read_page` that decodes by the note; and format
-  `VERSION` 2, whose reader still reads version 1 files.
+- `page_file.py` — `plain_pages`, and a `Page.encoding` packing note on
+  every page. `write` takes a per-column `encoding` choice, with
+  `"smallest"` picking page by page. `read_page` decodes by the note. And
+  format `VERSION` 2 arrives, whose reader still reads version 1 files.
 
 - `cli.py` — the `nanolance packing` demo: `describe`, `every_way`,
   `write_and_read_back`, `packing_notes`, and `ask_qty`.
@@ -2160,19 +2167,19 @@ git diff v1-day-02 v1-day-03
   dependencies.
 
 **Deliberately naive:** the weigh-in tries every encoding on every page
-instead of deciding from cheap counts; each page uses one encoding — no
-layering, so a dictionary's codes are never bit-packed; dictionary codes
-are always one byte; bit-packing stores values from 0, so ids around a
-million would still need 20 bits each even when a page's ids differ by
-less than 100 (storing each value's distance from the page's smallest —
-*frame of reference* — would fix that); and decoding builds the whole
-page in memory before cutting it into values.
+instead of deciding from cheap counts. Each page uses one encoding, with
+no layering, so a dictionary's codes are never bit-packed. Dictionary
+codes are always one byte. Bit-packing stores values from 0, so ids
+around a million would still need 20 bits each, even when a page's ids
+differ by less than 100. Storing each value's distance from the page's
+smallest, called *frame of reference*, would fix that. And decoding
+builds the whole page in memory before cutting it into values.
 
-**Tomorrow, on Day 4:** every value still has a fixed width — and for
-names, that width is a lie: `tape` is padded to 12 bytes, and a name
+**Tomorrow, on Day 4:** every value still has a fixed width, and for
+names, that width is a lie. `tape` is padded to 12 bytes, and a name
 longer than 12 bytes cannot be stored at all (Day 1's
 `screwdriver set` was refused). Day 4 stores values of any length, with
 a list of where each one starts, and values that are missing altogether.
-The packer has learned to pack tight — see [the
-warehouse](story.md); next, the boxes learn to hold things of every
+The packer has learned to pack tight (see [the
+warehouse](story.md)). Next, the boxes learn to hold things of every
 size, and empty compartments.

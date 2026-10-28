@@ -1,28 +1,28 @@
 # Introduction
 
 You are going to build a columnar data format and a small vector database
-in Python, from scratch, in 18 days — the kind of system that stores a
-table so a question about one column reads only that column, keeps every
-past version of the table one step away, and finds the rows most similar
-to a query without looking at all of them.
+in Python, from scratch, in 18 days. It stores a table so that a question
+about one column reads only that column. It keeps every past version of
+the table one step away. And it finds the rows most similar to a query
+without looking at all of them.
 
 By Day 17 your system will have:
 
-- **a file format** — each column cut into pages, with a footer at the end
-  that says where every page lives, so a reader jumps straight to the
-  bytes it needs,
+- **a file format** — each column cut into pages. A footer at the end
+  says where every page lives, so a reader jumps straight to the bytes it
+  needs,
 
 - **encodings** — ways to store the same values in fewer bytes, each one
   proven to give back exactly what went in,
 
-- **a versioned table** — many files plus a small record of each version
-  (Lance calls it a *manifest*), so you can append, delete, update, add a
+- **a versioned table** — many files plus a small record of each version,
+  which Lance calls a *manifest*. You can append, delete, update, and add a
   column, and still read the table as it was yesterday,
 
-- **indexes** — sorted and bitmap indexes that let filters skip most of the
-  table, and vector indexes that sort similar vectors into groups and
-  shrink each vector to a few short codes, so a search reads a few groups
-  instead of everything,
+- **indexes** — sorted and bitmap indexes let filters skip most of the
+  table. Vector indexes sort similar vectors into groups and shrink each
+  vector to a few short codes, so a search reads a few groups instead of
+  everything,
 
 - **a small database on top** — tables in a folder, a query builder,
   full-text search, hybrid search, and a tiny built-in embedder, ending in
@@ -31,9 +31,8 @@ By Day 17 your system will have:
 ## Who this is for
 
 You need some programming experience in any language. You do **not** need
-to know Python, databases, or machine learning — each idea is introduced
-when the code first needs it, with a plain-English analogy before any
-code. Everything runs on one laptop, with no GPU and no network for the
+to know Python, databases, or machine learning. You meet each idea when
+the code first needs it, with a plain-English analogy before any code. Everything runs on one laptop, with no GPU and no network for the
 tests.
 
 ## How we measure: bytes and reads, not milliseconds
@@ -43,60 +42,60 @@ course timed everything with a stopwatch, the numbers would mostly measure
 Python. So every "this reads less" claim is a **count**: how many bytes a
 query read, how many separate reads it issued, how many pages it touched.
 From Day 1 on, a small wrapper around the file does the counting for you.
-A count tells the same story in any language — it is the layout talking,
-not the interpreter. Wall-clock time shows up only as a second, clearly
-caveated number.
+A count tells the same story in any language, because it measures the
+layout, not the interpreter. Wall-clock time shows up only as a second
+number, with its caveats stated.
 
 ## Real Lance is the referee
 
 The finale, Day 17, runs a small search app on your code and on the real
 `lancedb` package, on the same data, and compares the results. Before
-that, every day is its own referee: tests check each result against the
-data that went in — the same rows back from a scan, a fetch by row id, or
-an old version of the table — and every cost is counted. Vector search is
-judged by *recall*, the share of the true nearest neighbors your index
-finds. One honest limit: your files
-will not be readable by real Lance. The course rebuilds Lance's ideas, not
-its exact bytes.
+that, every day is its own referee. Tests check each result against the
+data that went in: a scan, a fetch by row id, or an old version of the
+table must give back the same rows. Every cost is counted, too. Vector
+search is judged by *recall*, the share of the true nearest neighbors your
+index finds. One honest limit: real Lance will not be able to read your
+files. You rebuild Lance's ideas, not its exact bytes.
 
 ## One story holds it all together
 
-Every day adds a scene to one running story — a warehouse — and each
+Every day adds a scene to one running story, set in a warehouse. Each
 piece of the format is one thing in it: an aisle, a sealed box, the wall
 card at the back.
 [The warehouse: an analogy to help you build the right mental model](story.md)
 keeps the whole story on one page. Come back to it whenever an earlier
 idea gets fuzzy. In the chapters, a concept name with a dotted underline
-links there: click it, and a short reminder of what the concept is, what
-it is in the story, and which day introduced it opens right where you are
-reading. In the code, the story rides along too: every docstring that
-starts with `Analogy:` has that paragraph highlighted, so you can spot
+links there. Click it, and a short reminder opens right where you are
+reading: what the concept is, what it is in the story, and which day
+introduced it. The story rides along in the code too. Every docstring
+paragraph that starts with `Analogy:` is highlighted, so you can spot
 where a scene from the story meets the code that builds it.
 
 ## How the course works
 
 Each day is one chapter and one theme, built as **two to four related
-sections** — each section is one focused capability with its own runnable
-finish, and a day's sections always tell a single story. Every section is
-one git commit with its own checkpoint tag (`v1-day-03a`, `v1-day-03b`, …),
-and the day's last section doubles as the day tag (`v1-day-03`). After
-finishing a section, `./scripts/compare.sh <tag>` checks your code — and
-only your code (`src/`, `tests/`, `pyproject.toml`; never chapters or
-README) — against that checkpoint. It ignores comments, docstrings,
-formatting, and the order of top-level definitions, so its ✓ means the
-section is done.
+sections**. Each section adds one focused capability that you can run
+when it is done, and a day's sections always tell a single story. Every
+section is one git commit with its own checkpoint tag (`v1-day-03a`,
+`v1-day-03b`, …). The day's last section doubles as the day tag
+(`v1-day-03`). After you finish a section, `./scripts/compare.sh <tag>`
+checks your code against that checkpoint. It looks only at your code
+(`src/`, `tests/`, `pyproject.toml`), never at chapters or the README.
+It ignores comments, docstrings, formatting, and the order of top-level
+definitions, so its ✓ means the section is done.
 
-The Python language itself is taught by reference instead of by detour:
-every code section opens with a small **Python used here** strip linking
-exactly the constructs its code leans on (functions, `bytes`, `struct`, …)
-to the matching page of the official
+The course teaches the Python language by reference instead of by
+detour. Every code section opens with a small **Python used here** strip.
+It links the constructs that section's code leans on (functions, `bytes`,
+`struct`, …) to the matching page of the official
 [Python documentation](https://docs.python.org/3.12/). No prior Python is
-assumed; read only the strips you need.
+assumed, so read only the strips you need.
 
-Every chapter has the same shape: what you will have running, what its
-output will show, why yesterday's code is not enough, a mental model, the
-code section by section, the exact commands to run, the output you should
-see, tests, one deliberate way to break it, and a checkpoint.
+Every chapter has the same shape. It shows what you will have running
+and what its output will show, then why yesterday's code is not enough.
+A mental model comes next, then the code section by section. It ends with
+the exact commands to run, the output you should see, tests, one
+deliberate way to break it, and a checkpoint.
 
 ## The 18 days
 
@@ -135,8 +134,8 @@ Two rules keep the course honest:
 1. **Every day ends green.** At every tag, formatting, lints, tests, the
    day's smoke command, and the book build all pass.
 
-2. **Naive before optimized.** Every optimization arrives after a slow,
-   clearly correct version you already understand — so you can count, in
-   bytes and reads, exactly what the optimization buys.
+2. **Naive before optimized.** Every optimization arrives after a slow
+   version that is plainly correct and that you already understand. Then
+   you can count, in bytes and reads, exactly what the optimization buys.
 
 Head to [Setup](setup.md) to get your tools ready.
