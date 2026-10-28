@@ -190,7 +190,7 @@ lives in the book's [introduction](book/src/introduction.md).
 | 12&nbsp;✅&#8288;🔒 | Product quantization | Store each vector as a few short codes: far less memory, a little less recall, and a refine step to win it back. | 2.5&nbsp;h |
 | 13&nbsp;✅&#8288;🔒 | The database | Connect to a folder, create and open tables, add, upsert, delete. | 2.5&nbsp;h |
 | 14&nbsp;✅&#8288;🔒 | The query builder | `search().where().limit()` — and why filtering after the search can quietly return too few results. | 2.5&nbsp;h |
-| 15&nbsp;🔒 | Full-text search | Split text into words, build an inverted index, and rank matches with BM25. | 2&nbsp;h |
+| 15&nbsp;✅&#8288;🔒 | Full-text search | Split text into words, build an inverted index, and rank matches with BM25. | 2.5&nbsp;h |
 | 16&nbsp;🔒 | Hybrid search | Combine vector and keyword results into one ranking. | 1.5&nbsp;h |
 | 17&nbsp;🔒 | The payoff: semantic search | A tiny built-in embedder, automatic embedding on insert and query, and a small search app checked against real LanceDB. | 3&nbsp;h |
 
