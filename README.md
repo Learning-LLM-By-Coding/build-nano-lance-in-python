@@ -186,7 +186,7 @@ lives in the book's [introduction](book/src/introduction.md).
 | 8&nbsp;✅&#8288;🔒 | Schema evolution | Add a column to a big table without rewriting it; drop one. | 2.5&nbsp;h |
 | 9&nbsp;✅&#8288;🔒 | Compaction and cleanup | Merge many small files into a few, and delete versions nobody needs. | 2.5&nbsp;h |
 | 10&nbsp;✅&#8288;🔒 | Scalar indexes | A sorted index and a bitmap index let filters skip most of the table. | 2.5&nbsp;h |
-| 11&nbsp;🔒 | Vector search | Find the nearest vectors: check every one, then only the few closest clusters — and measure what that costs in recall. | 2.5&nbsp;h |
+| 11&nbsp;✅&#8288;🔒 | Vector search | Find the nearest vectors: check every one, then only the few closest clusters — and measure what that costs in recall. | 2.5&nbsp;h |
 | 12&nbsp;🔒 | Product quantization | Store each vector as a few short codes: far less memory, a little less recall, and a refine step to win it back. | 2.5&nbsp;h |
 | 13&nbsp;🔒 | The database | Connect to a folder, create and open tables, add, upsert, delete. | 2&nbsp;h |
 | 14&nbsp;🔒 | The query builder | `search().where().limit()` — and why filtering after the search can quietly return too few results. | 2.5&nbsp;h |
